@@ -1,79 +1,34 @@
-// File: apps/mobile/app/(tabs)/saved.tsx
-import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { FlatList, Text, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { EmptyState } from "../../components/EmptyState";
-import { PropertyCard } from "../../components/PropertyCard";
-import { SkeletonCard } from "../../components/SkeletonCard";
-import { apiClient } from "../../lib/axios";
-import { useAuthStore } from "../../stores/authStore";
-import type { Listing } from "../../types";
+import { ListingCard } from "../../components/listing";
+import { Button, EmptyState, ErrorBox, Skeleton, Title } from "../../components/ui";
+import { useSavedListings } from "../../hooks/data";
 
 export default function SavedScreen() {
-  const { isAuthenticated } = useAuthStore();
   const router = useRouter();
-
-  const { data, isLoading } = useQuery<Array<{ listing: Listing }>>({
-    queryKey: ["saved-listings"],
-    queryFn: async () => {
-      const res = await apiClient.get("/api/listings/tenant/saved");
-      return res.data.data;
-    },
-    enabled: isAuthenticated,
-  });
-
-  if (!isAuthenticated) {
-    return (
-      <SafeAreaView className="flex-1 bg-[#FAFAF7]" edges={["top"]}>
-        <EmptyState
-          icon="heart"
-          title="Save your favourites"
-          description="Log in to save listings and access them from any device."
-          ctaLabel="Log in"
-          onCtaPress={() => router.push("/(auth)/login")}
-        />
-      </SafeAreaView>
-    );
-  }
-
+  const saved = useSavedListings();
   return (
-    <SafeAreaView className="flex-1 bg-[#FAFAF7]" edges={["top"]}>
-      <View className="px-4 pt-4 pb-2">
-        <Text
-          className="text-2xl text-[#1A3C5E]"
-          style={{ fontFamily: "PlayfairDisplay_700Bold" }}
-        >
-          Saved
-        </Text>
-      </View>
-
-      {isLoading ? (
-        <View className="px-4 gap-4">
-          {[1, 2, 3].map((i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </View>
-      ) : !data?.length ? (
-        <EmptyState
-          icon="heart"
-          title="No saved listings"
-          description="Tap the heart on any listing to save it here."
-          ctaLabel="Browse listings"
-          onCtaPress={() => router.push("/(tabs)")}
-        />
-      ) : (
-        <FlatList
-          data={data}
-          keyExtractor={({ listing }) => listing.id}
-          contentContainerClassName="px-4 pb-8"
-          renderItem={({ item: { listing } }) => (
-            <View className="mb-4">
-              <PropertyCard listing={listing} />
+    <SafeAreaView edges={["top"]} className="flex-1 bg-bg">
+      <FlatList
+        data={saved.data ?? []}
+        keyExtractor={(item) => item.listing.id}
+        contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 32 }}
+        refreshControl={<RefreshControl refreshing={saved.isRefetching} onRefresh={() => saved.refetch()} />}
+        ListHeaderComponent={<Title sub="Homes you've saved. A home disappears once it's let.">Saved homes</Title>}
+        ListEmptyComponent={
+          saved.isPending ? (
+            <View className="gap-4">
+              <Skeleton className="h-64" />
             </View>
-          )}
-        />
-      )}
+          ) : saved.isError ? (
+            <ErrorBox message="We couldn't load your saved homes." onRetry={() => saved.refetch()} />
+          ) : (
+            <EmptyState icon="heart" title="No saved homes yet" body="Tap the heart on any home to keep it here." action={<Button onPress={() => router.push("/")}>Browse homes</Button>} />
+          )
+        }
+        renderItem={({ item }) => <ListingCard listing={item.listing} />}
+      />
     </SafeAreaView>
   );
 }

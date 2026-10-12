@@ -7,7 +7,7 @@
     ],
     "allowJs": true,
     "jsx": "react-native",
-    "module": "commonjs",
+    "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "strict": true,
@@ -28,7 +28,10 @@
       "@lettr/config": [
         "../../packages/config"
       ]
-    }
+    },
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true
   },
   "include": [
     "**/*.ts",

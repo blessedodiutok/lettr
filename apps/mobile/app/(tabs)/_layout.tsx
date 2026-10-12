@@ -1,66 +1,48 @@
-// File: apps/mobile/app/(tabs)/_layout.tsx
-// Bottom tab bar — 4 tabs: Explore, Saved, Messages, Profile
+// Bottom tabs. Tenants: Explore, Saved, Messages, Rental, Profile.
+// Landlords: Overview, Listings, Inquiries, Tenancies, Profile.
+// Signed-out visitors: Explore and Profile (which offers login).
 
+import { Feather } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { TabBarIcon } from "../../components/TabBarIcon";
+import { useUnreadCount } from "../../hooks/data";
+import { useAuthStore } from "../../stores/auth";
+
+type Icon = keyof typeof Feather.glyphMap;
+const icon = (name: Icon) => ({ color }: { color: string }) => <Feather name={name} size={22} color={color} />;
 
 export default function TabsLayout() {
+  const user = useAuthStore((s) => s.user);
+  const unread = useUnreadCount().data?.unreadCount ?? 0;
+  const tenant = user?.role === "TENANT";
+  const landlord = user?.role === "LANDLORD";
+  const hide = { href: null } as const;
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: "#FFFFFF",
-          borderTopColor: "#E2E8F0",
-          borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
         tabBarActiveTintColor: "#1A3C5E",
-        tabBarInactiveTintColor: "#94A3B8",
-        tabBarLabelStyle: {
-          fontFamily: "DMSans_500Medium",
-          fontSize: 11,
-        },
+        tabBarInactiveTintColor: "#5B6B7D",
+        tabBarStyle: { backgroundColor: "#FFFFFF", borderTopColor: "#DAE2EA" },
+        tabBarLabelStyle: { fontFamily: "DMSans_500Medium", fontSize: 11 },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Explore",
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon name="search" color={color} focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="saved"
-        options={{
-          title: "Saved",
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon name="heart" color={color} focused={focused} />
-          ),
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: "Explore", tabBarIcon: icon("search"), ...(landlord ? hide : {}) }} />
+      <Tabs.Screen name="overview" options={{ title: "Overview", tabBarIcon: icon("grid"), ...(landlord ? {} : hide) }} />
+      <Tabs.Screen name="listings" options={{ title: "Listings", tabBarIcon: icon("home"), ...(landlord ? {} : hide) }} />
+      <Tabs.Screen name="saved" options={{ title: "Saved", tabBarIcon: icon("heart"), ...(tenant ? {} : hide) }} />
       <Tabs.Screen
         name="messages"
         options={{
-          title: "Messages",
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon name="message-circle" color={color} focused={focused} />
-          ),
+          title: landlord ? "Inquiries" : "Messages",
+          tabBarIcon: icon("message-circle"),
+          tabBarBadge: unread ? (unread > 9 ? "9+" : unread) : undefined,
+          tabBarBadgeStyle: { backgroundColor: "#B8862A", color: "#1B1406" },
+          ...(user ? {} : hide),
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon name="user" color={color} focused={focused} />
-          ),
-        }}
-      />
+      <Tabs.Screen name="rental" options={{ title: landlord ? "Tenancies" : "Rental", tabBarIcon: icon("file-text"), ...(user ? {} : hide) }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: icon("user") }} />
     </Tabs>
   );
 }

@@ -1,291 +1,80 @@
-// File: apps/mobile/app/(auth)/signup.tsx
-import { zodResolver } from "@hookform/resolvers/zod";
+import { Feather } from "@expo/vector-icons";
+import { SignupSchema } from "@lettr/zod-schemas";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useRouter } from "expo-router";
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { z } from "zod";
-import { apiClient } from "../../lib/axios";
+import { Pressable, Text, View } from "react-native";
+import { AuthScreen, FormError } from "../../components/AuthScreen";
+import { Button, COLORS, Field } from "../../components/ui";
+import { api, errorMessage } from "../../lib/api";
 
-const schema = z.object({
-  role: z.enum(["TENANT", "LANDLORD"]),
-  firstName: z.string().min(2, "Required"),
-  lastName: z.string().min(2, "Required"),
-  email: z.string().email("Enter a valid email"),
-  phone: z.string().optional(),
-  password: z.string().min(8, "Minimum 8 characters"),
-});
-type FormData = z.infer<typeof schema>;
+const ROLES = [
+  { value: "TENANT", title: "Looking for a home", icon: "search" },
+  { value: "LANDLORD", title: "Letting a property", icon: "home" },
+] as const;
 
 export default function SignupScreen() {
   const router = useRouter();
-  const [role, setRole] = useState<"TENANT" | "LANDLORD">("TENANT");
-
-  const {
-    control,
-    handleSubmit,
-    setValue,
-    formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { role: "TENANT" },
-  });
+  const [form, setForm] = useState({ role: "TENANT" as "TENANT" | "LANDLORD", firstName: "", lastName: "", email: "", phone: "", password: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const set = (key: keyof typeof form) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
 
   const signup = useMutation({
-    mutationFn: async (data: FormData) => {
-      const res = await apiClient.post<{ data: { userId: string } }>(
-        "/api/auth/signup",
-        data,
-      );
-      return res.data.data;
-    },
-    onSuccess: (data) => {
-      router.push(`/(auth)/verify-otp?userId=${data.userId}`);
-    },
+    mutationFn: (body: unknown) => api<{ userId: string; email: string }>("post", "/api/auth/signup", body),
+    onSuccess: (data) => router.push({ pathname: "/(auth)/verify", params: { userId: data.userId, email: data.email } }),
   });
 
-  function selectRole(r: "TENANT" | "LANDLORD") {
-    setRole(r);
-    setValue("role", r);
-  }
+  const submit = () => {
+    const parsed = SignupSchema.safeParse(form);
+    if (!parsed.success) {
+      const next: Record<string, string> = {};
+      for (const issue of parsed.error.issues) next[String(issue.path[0])] ??= issue.message;
+      return setErrors(next);
+    }
+    setErrors({});
+    signup.mutate(parsed.data);
+  };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-[#FAFAF7]"
-    >
-      <ScrollView
-        contentContainerClassName="flex-grow px-6 py-8"
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text
-          className="text-3xl text-[#1A3C5E] mb-2"
-          style={{ fontFamily: "PlayfairDisplay_700Bold" }}
-        >
-          Join Lettr
-        </Text>
-        <Text
-          className="text-[#64748B] mb-8"
-          style={{ fontFamily: "DMSans_400Regular" }}
-        >
-          Rent directly. No agents.
-        </Text>
-
-        {/* Role selector */}
-        <View className="flex-row gap-3 mb-6">
-          {(["TENANT", "LANDLORD"] as const).map((r) => (
-            <TouchableOpacity
-              key={r}
-              onPress={() => selectRole(r)}
-              className={[
-                "flex-1 py-3 rounded-xl border-2 items-center",
-                role === r
-                  ? "border-[#1A3C5E] bg-[#EEF3F8]"
-                  : "border-[#E2E8F0] bg-white",
-              ].join(" ")}
+    <AuthScreen title="Create your account" sub="Free to join. Tenants pay a 3% fee only when they rent.">
+      <View className="flex-row gap-3">
+        {ROLES.map((role) => {
+          const active = form.role === role.value;
+          return (
+            <Pressable
+              key={role.value}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              onPress={() => setForm((f) => ({ ...f, role: role.value }))}
+              className={`flex-1 gap-2 rounded-xl border-2 p-3.5 ${active ? "border-navy bg-navy-soft" : "border-line bg-surface"}`}
             >
-              <Text
-                className={
-                  role === r ? "text-[#1A3C5E] font-bold" : "text-[#64748B]"
-                }
-                style={{ fontFamily: "DMSans_700Bold" }}
-              >
-                {r === "TENANT" ? "🏠 Tenant" : "🏢 Landlord"}
-              </Text>
-            </TouchableOpacity>
-          ))}
+              <Feather name={role.icon} size={20} color={active ? COLORS.navy : COLORS.muted} />
+              <Text className="font-sans-bold text-sm text-ink">{role.title}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View className="flex-row gap-3">
+        <View className="flex-1">
+          <Field label="First name" value={form.firstName} onChangeText={set("firstName")} autoComplete="given-name" error={errors.firstName} />
         </View>
-
-        {/* First + Last name */}
-        <View className="flex-row gap-3 mb-4">
-          <View className="flex-1">
-            <Text
-              className="text-sm font-semibold text-[#374151] mb-1.5"
-              style={{ fontFamily: "DMSans_700Bold" }}
-            >
-              First name
-            </Text>
-            <Controller
-              control={control}
-              name="firstName"
-              render={({ field: { onChange, value, onBlur } }) => (
-                <TextInput
-                  className="h-12 px-4 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#1E293B]"
-                  placeholder="Emeka"
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  value={value}
-                  placeholderTextColor="#94A3B8"
-                />
-              )}
-            />
-            {errors.firstName && (
-              <Text className="text-xs text-red-500 mt-1">
-                {errors.firstName.message}
-              </Text>
-            )}
-          </View>
-          <View className="flex-1">
-            <Text
-              className="text-sm font-semibold text-[#374151] mb-1.5"
-              style={{ fontFamily: "DMSans_700Bold" }}
-            >
-              Last name
-            </Text>
-            <Controller
-              control={control}
-              name="lastName"
-              render={({ field: { onChange, value, onBlur } }) => (
-                <TextInput
-                  className="h-12 px-4 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#1E293B]"
-                  placeholder="Okonkwo"
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  value={value}
-                  placeholderTextColor="#94A3B8"
-                />
-              )}
-            />
-            {errors.lastName && (
-              <Text className="text-xs text-red-500 mt-1">
-                {errors.lastName.message}
-              </Text>
-            )}
-          </View>
+        <View className="flex-1">
+          <Field label="Last name" value={form.lastName} onChangeText={set("lastName")} autoComplete="family-name" error={errors.lastName} />
         </View>
-
-        {/* Email */}
-        <View className="mb-4">
-          <Text
-            className="text-sm font-semibold text-[#374151] mb-1.5"
-            style={{ fontFamily: "DMSans_700Bold" }}
-          >
-            Email address
-          </Text>
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <TextInput
-                className="h-12 px-4 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#1E293B]"
-                placeholder="you@example.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                onChangeText={onChange}
-                onBlur={onBlur}
-                value={value}
-                placeholderTextColor="#94A3B8"
-              />
-            )}
-          />
-          {errors.email && (
-            <Text className="text-xs text-red-500 mt-1">
-              {errors.email.message}
-            </Text>
-          )}
-        </View>
-
-        {/* Phone */}
-        <View className="mb-4">
-          <Text
-            className="text-sm font-semibold text-[#374151] mb-1.5"
-            style={{ fontFamily: "DMSans_700Bold" }}
-          >
-            Phone <Text className="font-normal text-[#94A3B8]">(optional)</Text>
-          </Text>
-          <Controller
-            control={control}
-            name="phone"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <TextInput
-                className="h-12 px-4 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#1E293B]"
-                placeholder="+234 800 000 0000"
-                keyboardType="phone-pad"
-                onChangeText={onChange}
-                onBlur={onBlur}
-                value={value}
-                placeholderTextColor="#94A3B8"
-              />
-            )}
-          />
-        </View>
-
-        {/* Password */}
-        <View className="mb-6">
-          <Text
-            className="text-sm font-semibold text-[#374151] mb-1.5"
-            style={{ fontFamily: "DMSans_700Bold" }}
-          >
-            Password
-          </Text>
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <TextInput
-                className="h-12 px-4 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#1E293B]"
-                placeholder="Minimum 8 characters"
-                secureTextEntry
-                onChangeText={onChange}
-                onBlur={onBlur}
-                value={value}
-                placeholderTextColor="#94A3B8"
-              />
-            )}
-          />
-          {errors.password && (
-            <Text className="text-xs text-red-500 mt-1">
-              {errors.password.message}
-            </Text>
-          )}
-        </View>
-
-        {signup.isError && (
-          <View className="bg-red-50 border border-red-100 rounded-xl p-3 mb-4">
-            <Text className="text-red-600 text-sm">
-              {(signup.error as { response?: { data?: { error?: string } } })
-                ?.response?.data?.error ?? "Sign up failed. Please try again."}
-            </Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          onPress={handleSubmit((data) => signup.mutate(data))}
-          disabled={signup.isPending}
-          className="h-12 bg-[#1A3C5E] rounded-xl items-center justify-center mb-4"
-          activeOpacity={0.85}
-        >
-          {signup.isPending ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text
-              className="text-white font-bold text-base"
-              style={{ fontFamily: "DMSans_700Bold" }}
-            >
-              Create account
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <Link href="/(auth)/login" asChild>
-          <TouchableOpacity className="items-center">
-            <Text className="text-sm text-[#64748B]">
-              Already have an account?{" "}
-              <Text className="text-[#1A3C5E] font-bold">Log in</Text>
-            </Text>
-          </TouchableOpacity>
+      </View>
+      <Field label="Email address" value={form.email} onChangeText={set("email")} autoCapitalize="none" keyboardType="email-address" autoComplete="email" error={errors.email} />
+      <Field label="Phone number (optional)" value={form.phone} onChangeText={set("phone")} keyboardType="phone-pad" placeholder="0801 234 5678" error={errors.phone} />
+      <Field label="Password" value={form.password} onChangeText={set("password")} secureTextEntry autoComplete="new-password" hint="At least 8 characters, with a letter and a number." error={errors.password} />
+      <FormError message={signup.isError ? errorMessage(signup.error) : null} />
+      <Button size="lg" loading={signup.isPending} onPress={submit}>
+        Create account
+      </Button>
+      <Text className="text-center font-sans text-sm text-muted">
+        Already have an account?{" "}
+        <Link href="/(auth)/login" className="font-sans-bold text-navy">
+          Log in
         </Link>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </Text>
+    </AuthScreen>
   );
 }

@@ -1,135 +1,61 @@
-// File: apps/mobile/app/(tabs)/messages.tsx
-import { useQuery } from "@tanstack/react-query";
+import { formatRelativeDate } from "@lettr/utils";
 import { useRouter } from "expo-router";
-import { FlatList, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { EmptyState } from "../../components/EmptyState";
-import { SkeletonCard } from "../../components/SkeletonCard";
-import { apiClient } from "../../lib/axios";
-import { formatDate } from "../../lib/utils";
-import { useAuthStore } from "../../stores/authStore";
-
-interface InquiryThread {
-  id: string;
-  status: string;
-  updatedAt: string;
-  listing: {
-    property: { title: string; neighbourhood: string; state: string };
-  };
-  tenant: { firstName: string; lastName: string };
-  landlord: { firstName: string; lastName: string };
-  messages: Array<{ message: string; sentAt: string }>;
-}
+import { Avatar, EmptyState, ErrorBox, Skeleton, StatusPill, Title } from "../../components/ui";
+import { useInquiries } from "../../hooks/data";
+import { useAuthStore } from "../../stores/auth";
 
 export default function MessagesScreen() {
-  const { isAuthenticated, user } = useAuthStore();
   const router = useRouter();
-
-  const { data, isLoading } = useQuery<InquiryThread[]>({
-    queryKey: ["inquiries"],
-    queryFn: async () => {
-      const res = await apiClient.get("/api/inquiries/my");
-      return res.data.data;
-    },
-    enabled: isAuthenticated,
-  });
-
-  if (!isAuthenticated) {
-    return (
-      <SafeAreaView className="flex-1 bg-[#FAFAF7]" edges={["top"]}>
-        <EmptyState
-          icon="message-circle"
-          title="Your messages"
-          description="Log in to view your conversations with landlords."
-          ctaLabel="Log in"
-          onCtaPress={() => router.push("/(auth)/login")}
-        />
-      </SafeAreaView>
-    );
-  }
-
-  const lastMessage = (thread: InquiryThread) =>
-    thread.messages[thread.messages.length - 1];
+  const user = useAuthStore((s) => s.user);
+  const inquiries = useInquiries("active");
+  const landlord = user?.role === "LANDLORD";
 
   return (
-    <SafeAreaView className="flex-1 bg-[#FAFAF7]" edges={["top"]}>
-      <View className="px-4 pt-4 pb-2">
-        <Text
-          className="text-2xl text-[#1A3C5E]"
-          style={{ fontFamily: "PlayfairDisplay_700Bold" }}
-        >
-          Messages
-        </Text>
-      </View>
-
-      {isLoading ? (
-        <View className="px-4 gap-3">
-          {[1, 2, 3].map((i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </View>
-      ) : !data?.length ? (
-        <EmptyState
-          icon="message-circle"
-          title="No conversations yet"
-          description="Send an inquiry on any listing to start a conversation."
-          ctaLabel="Browse listings"
-          onCtaPress={() => router.push("/(tabs)")}
-        />
-      ) : (
-        <FlatList
-          data={data}
-          keyExtractor={(item) => item.id}
-          contentContainerClassName="px-4 pb-8"
-          renderItem={({ item }) => {
-            const other =
-              user?.role === "TENANT"
-                ? `${item.landlord.firstName} ${item.landlord.lastName}`
-                : `${item.tenant.firstName} ${item.tenant.lastName}`;
-            const last = lastMessage(item);
-
-            return (
-              <TouchableOpacity
-                onPress={() => router.push(`/messages/${item.id}`)}
-                className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-3 flex-row items-center gap-3"
-                activeOpacity={0.8}
-              >
-                <View className="w-11 h-11 bg-[#EEF3F8] rounded-full items-center justify-center flex-shrink-0">
-                  <Text className="text-[#1A3C5E] font-bold text-base">
-                    {other.charAt(0)}
+    <SafeAreaView edges={["top"]} className="flex-1 bg-bg">
+      <FlatList
+        data={inquiries.data ?? []}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        refreshControl={<RefreshControl refreshing={inquiries.isRefetching} onRefresh={() => inquiries.refetch()} />}
+        ListHeaderComponent={<Title sub={landlord ? "Tenants interested in your homes." : "Your conversations with landlords."}>{landlord ? "Inquiries" : "Messages"}</Title>}
+        ItemSeparatorComponent={() => <View className="h-2" />}
+        ListEmptyComponent={
+          inquiries.isPending ? (
+            <Skeleton className="h-20" />
+          ) : inquiries.isError ? (
+            <ErrorBox message="We couldn't load conversations." onRetry={() => inquiries.refetch()} />
+          ) : (
+            <EmptyState icon="message-circle" title="No conversations yet" body={landlord ? "When tenants message you, it appears here." : "Find a home and message the landlord."} />
+          )
+        }
+        renderItem={({ item }) => {
+          const other = landlord ? item.tenant : item.landlord;
+          return (
+            <Pressable accessibilityRole="button" onPress={() => router.push(`/messages/${item.id}`)} className="flex-row items-center gap-3 rounded-xl border border-line bg-surface p-3.5 active:opacity-80">
+              <Avatar person={other} size={44} />
+              <View className="flex-1">
+                <View className="flex-row items-center justify-between gap-2">
+                  <Text numberOfLines={1} className={`flex-1 text-[15px] text-ink ${item.unreadCount ? "font-sans-bold" : "font-sans-medium"}`}>
+                    {other.firstName} {other.lastName}
                   </Text>
+                  <Text className="font-sans text-xs text-muted">{formatRelativeDate(item.updatedAt).replace("about ", "")}</Text>
                 </View>
-                <View className="flex-1 min-w-0">
-                  <View className="flex-row justify-between items-center mb-0.5">
-                    <Text
-                      className="text-sm font-bold text-[#1E293B]"
-                      style={{ fontFamily: "DMSans_700Bold" }}
-                    >
-                      {other}
-                    </Text>
-                    {last && (
-                      <Text className="text-xs text-[#94A3B8]">
-                        {formatDate(last.sentAt)}
-                      </Text>
-                    )}
-                  </View>
-                  <Text className="text-xs text-[#64748B]" numberOfLines={1}>
-                    {item.listing.property.title}
+                <Text numberOfLines={1} className="font-sans text-[13px] text-muted">
+                  {item.listing.property.title}
+                </Text>
+                <View className="mt-1 flex-row items-center justify-between gap-2">
+                  <Text numberOfLines={1} className={`flex-1 text-[13px] ${item.unreadCount ? "font-sans-bold text-ink" : "font-sans text-ink-2"}`}>
+                    {item.lastMessage ? `${item.lastMessage.senderId === user?.id ? "You: " : ""}${item.lastMessage.body}` : ""}
                   </Text>
-                  {last && (
-                    <Text
-                      className="text-xs text-[#94A3B8] mt-0.5"
-                      numberOfLines={1}
-                    >
-                      {last.message}
-                    </Text>
-                  )}
+                  <StatusPill kind="inquiry" status={item.status} />
                 </View>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      )}
+              </View>
+            </Pressable>
+          );
+        }}
+      />
     </SafeAreaView>
   );
 }

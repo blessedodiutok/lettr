@@ -1,160 +1,112 @@
-// File: apps/mobile/app/(tabs)/index.tsx
-// Explore tab — search bar + featured listings
+// Explore: search, quick filters and results.
 
 import { Feather } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { Redirect } from "expo-router";
 import { useState } from "react";
-import {
-  FlatList,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { EmptyState } from "../../components/EmptyState";
-import { PropertyCard } from "../../components/PropertyCard";
-import { SkeletonCard } from "../../components/SkeletonCard";
-import { apiClient } from "../../lib/axios";
-import type { Listing } from "../../types";
+import { ListingCard } from "../../components/listing";
+import { COLORS, EmptyState, ErrorBox, Skeleton } from "../../components/ui";
+import { useListingSearch } from "../../hooks/data";
+import { useAuthStore } from "../../stores/auth";
 
-const CATEGORIES = [
+const TYPES = [
   { label: "All", value: "" },
   { label: "Self-con", value: "SELF_CONTAINED" },
   { label: "Mini flat", value: "MINI_FLAT" },
-  { label: "1 Bed", value: "ONE_BEDROOM" },
-  { label: "2 Bed", value: "TWO_BEDROOM" },
-  { label: "3 Bed", value: "THREE_BEDROOM" },
+  { label: "1 bed", value: "ONE_BEDROOM" },
+  { label: "2 bed", value: "TWO_BEDROOM" },
+  { label: "3 bed", value: "THREE_BEDROOM" },
   { label: "Duplex", value: "DUPLEX" },
 ];
 
+const BUDGETS = [
+  { label: "Any budget", value: "" },
+  { label: "≤ ₦1m", value: "1000000" },
+  { label: "≤ ₦2.5m", value: "2500000" },
+  { label: "≤ ₦5m", value: "5000000" },
+];
+
+function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      className={`h-9 justify-center rounded-full border px-3.5 ${active ? "border-navy bg-navy" : "border-line-strong bg-surface"}`}
+    >
+      <Text className={`font-sans-medium text-[13px] ${active ? "text-white" : "text-ink-2"}`}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export default function ExploreScreen() {
-  const router = useRouter();
-  const [activeCategory, setActiveCategory] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
+  const role = useAuthStore((s) => s.user?.role);
+  const [draft, setDraft] = useState("");
+  const [q, setQ] = useState("");
+  const [propertyType, setPropertyType] = useState("");
+  const [maxRent, setMaxRent] = useState("");
+  const search = useListingSearch({ q, propertyType, maxRent, limit: "30", sortBy: "newest" });
 
-  const { data, isLoading, refetch } = useQuery<{ listings: Listing[] }>({
-    queryKey: ["listings", activeCategory],
-    queryFn: async () => {
-      const params = new URLSearchParams(
-        activeCategory
-          ? [["limit", "20"], ["propertyType", activeCategory]]
-          : [["limit", "20"]],
-      );
-      const res = await apiClient.get(`/api/listings?${params.toString()}`);
-      return res.data.data;
-    },
-  });
-
-  async function handleRefresh() {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }
+  if (role === "LANDLORD") return <Redirect href="/overview" />;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#FAFAF7]" edges={["top"]}>
-      {/* Header */}
-      <View className="px-4 pt-2 pb-4 bg-[#1A3C5E]">
-        <Text
-          className="text-2xl text-white mb-4"
-          style={{ fontFamily: "PlayfairDisplay_700Bold" }}
-        >
-          Find your home
+    <SafeAreaView edges={["top"]} className="flex-1 bg-bg">
+      <View className="px-4 pb-3 pt-2">
+        <Text className="font-display text-[26px] text-ink">
+          Lettr<Text className="text-brass">.</Text>
         </Text>
-        {/* Search bar */}
-        <TouchableOpacity
-          onPress={() => router.push("/listings" as never)}
-          className="flex-row items-center bg-white rounded-xl px-4 h-11 gap-2"
-          activeOpacity={0.85}
-        >
-          <Feather name="search" size={16} color="#94A3B8" />
-          <Text
-            className="text-[#94A3B8] text-sm flex-1"
-            style={{ fontFamily: "DMSans_400Regular" }}
-          >
-            Search by location, type…
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        data={data?.listings ?? []}
-        keyExtractor={(item) => item.id}
-        contentContainerClassName="px-4 pb-8"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor="#1A3C5E"
+        <View className="mt-3 h-12 flex-row items-center rounded-xl border border-line-strong bg-surface px-3">
+          <Feather name="search" size={18} color={COLORS.muted} />
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            onSubmitEditing={() => setQ(draft.trim())}
+            returnKeyType="search"
+            placeholder="Lekki, Yaba, Wuse 2…"
+            placeholderTextColor="#8A97A6"
+            accessibilityLabel="Search by area or street"
+            className="ml-2 flex-1 font-sans text-[15px] text-ink"
           />
-        }
-        ListHeaderComponent={
-          <>
-            {/* Category chips */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="py-4 -mx-4 px-4"
-            >
-              {CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat.value}
-                  onPress={() => setActiveCategory(cat.value)}
-                  className={[
-                    "mr-2 px-4 py-2 rounded-full border",
-                    activeCategory === cat.value
-                      ? "bg-[#1A3C5E] border-[#1A3C5E]"
-                      : "bg-white border-[#E2E8F0]",
-                  ].join(" ")}
-                >
-                  <Text
-                    className={
-                      activeCategory === cat.value
-                        ? "text-white text-sm font-semibold"
-                        : "text-[#64748B] text-sm"
-                    }
-                    style={{ fontFamily: "DMSans_500Medium" }}
-                  >
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <Text
-              className="text-lg text-[#1A3C5E] mb-4"
-              style={{ fontFamily: "PlayfairDisplay_700Bold" }}
-            >
-              Latest listings
-            </Text>
-
-            {isLoading && (
-              <View className="gap-4">
-                {[1, 2, 3].map((i) => (
-                  <SkeletonCard key={i} />
-                ))}
-              </View>
-            )}
-          </>
-        }
-        ListEmptyComponent={
-          !isLoading ? (
-            <EmptyState
-              icon="search"
-              title="No listings found"
-              description="Try a different category or check back soon."
-            />
-          ) : null
-        }
-        renderItem={({ item }) => (
-          <View className="mb-4">
-            <PropertyCard listing={item} />
-          </View>
-        )}
-      />
+          {draft ? (
+            <Pressable accessibilityLabel="Clear search" onPress={() => (setDraft(""), setQ(""))}>
+              <Feather name="x" size={18} color={COLORS.muted} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+      <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+          {TYPES.map((t) => (
+            <Chip key={t.value} label={t.label} active={propertyType === t.value} onPress={() => setPropertyType(t.value)} />
+          ))}
+        </ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingTop: 8 }}>
+          {BUDGETS.map((b) => (
+            <Chip key={b.value} label={b.label} active={maxRent === b.value} onPress={() => setMaxRent(b.value)} />
+          ))}
+        </ScrollView>
+      </View>
+      {search.isPending ? (
+        <View className="gap-4 p-4">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </View>
+      ) : search.isError ? (
+        <View className="p-4">
+          <ErrorBox message="We couldn't load homes. Check your connection." onRetry={() => search.refetch()} />
+        </View>
+      ) : (
+        <FlatList
+          data={search.data.listings}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 32 }}
+          refreshControl={<RefreshControl refreshing={search.isRefetching} onRefresh={() => search.refetch()} />}
+          ListHeaderComponent={<Text className="font-sans text-sm text-muted">{search.data.pagination.total} homes · prices per year</Text>}
+          ListEmptyComponent={<EmptyState icon="search" title="No homes match" body="Try another area or a wider budget." />}
+          renderItem={({ item }) => <ListingCard listing={item} />}
+        />
+      )}
     </SafeAreaView>
   );
 }
