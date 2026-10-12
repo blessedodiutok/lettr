@@ -22,7 +22,8 @@
     "db:seed": "prisma db seed",
     "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
     "db:seed-admin": "tsx --conditions=lettr-source --env-file=.env prisma/dev/seedAdmin.ts",
-    "db:fix-sample-photos": "tsx --env-file=.env prisma/dev/fixSamplePhotos.ts"
+    "db:fix-sample-photos": "tsx --env-file=.env prisma/dev/fixSamplePhotos.ts",
+    "db:cleanup-smoke": "tsx --env-file=.env prisma/dev/cleanupSmoke.ts"
   },
   "dependencies": {
     "@lettr/types": "workspace:*",

@@ -19,7 +19,10 @@
     "db:migrate": "pnpm --filter @lettr/api exec prisma migrate dev",
     "db:seed": "pnpm --filter @lettr/api run db:seed",
     "db:studio": "pnpm --filter @lettr/api exec prisma studio",
-    "clean": "turbo run clean && node -e \"fs.rmSync('node_modules',{recursive:true,force:true})\""
+    "clean": "turbo run clean && node -e \"fs.rmSync('node_modules',{recursive:true,force:true})\"",
+    "test:e2e": "pnpm --filter @lettr/web exec playwright test",
+    "db:seed-admin": "pnpm --filter @lettr/api run db:seed-admin",
+    "check": "turbo run typecheck lint test"
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",

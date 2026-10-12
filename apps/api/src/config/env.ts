@@ -70,6 +70,9 @@ const envSchema = z
     if (!value.CLOUDINARY_CLOUD_NAME || !value.CLOUDINARY_API_KEY || !value.CLOUDINARY_API_SECRET) {
       ctx.addIssue({ code: "custom", path: ["CLOUDINARY_CLOUD_NAME"], message: "Cloudinary credentials are required in production" });
     }
+    if (!value.RESEND_API_KEY && !value.SMTP_HOST) {
+      ctx.addIssue({ code: "custom", path: ["RESEND_API_KEY"], message: "An email provider (RESEND_API_KEY or SMTP_HOST) is required in production" });
+    }
   });
 
 export const env = envSchema.parse(process.env);

@@ -18,17 +18,13 @@
     "clean": "node -e \"fs.rmSync('.next',{recursive:true,force:true});fs.rmSync('out',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@googlemaps/js-api-loader": "2.0.2",
     "@hookform/resolvers": "5.4.0",
     "@lettr/config": "workspace:*",
     "@lettr/types": "workspace:*",
     "@lettr/utils": "workspace:*",
     "@lettr/zod-schemas": "workspace:*",
     "@tanstack/react-query": "5.100.14",
-    "@tanstack/react-query-devtools": "5.100.14",
-    "@vercel/analytics": "2.0.1",
     "axios": "1.16.1",
-    "date-fns": "4.3.0",
     "lucide-react": "1.17.0",
     "motion": "12.40.0",
     "next": "16.2.6",

@@ -1,6 +1,7 @@
-// Development only: remove the data created by an end-to-end smoke run.
-//   tsx --env-file=.env prisma/dev/cleanupSmoke.ts <ids.json>
-// The JSON lists the user, listing and property IDs the run created.
+// Development only: remove the data created by smoke and end-to-end runs.
+//   tsx --env-file=.env prisma/dev/cleanupSmoke.ts [ids.json]
+// With a JSON file, removes the user, listing and property IDs it lists.
+// Without one, removes every account whose email starts with "smoke-" and what they own.
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
@@ -8,16 +9,25 @@ import fs from "node:fs";
 
 if (process.env.NODE_ENV === "production") throw new Error("Refusing to run in production");
 
-const { users, listings, properties } = JSON.parse(fs.readFileSync(process.argv[2], "utf8")) as {
-  users: string[];
-  listings: string[];
-  properties: string[];
-};
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 
-// Only touch accounts the smoke run created.
-const smokeUsers = await prisma.user.findMany({ where: { id: { in: users }, email: { startsWith: "smoke-" } }, select: { id: true } });
+const ids = process.argv[2]
+  ? (JSON.parse(fs.readFileSync(process.argv[2], "utf8")) as { users: string[]; listings: string[]; properties: string[] })
+  : null;
+
+// Only touch accounts a smoke run created.
+const smokeUsers = await prisma.user.findMany({
+  where: { email: { startsWith: "smoke-" }, ...(ids ? { id: { in: ids.users } } : {}) },
+  select: { id: true },
+});
 const userIds = smokeUsers.map((u) => u.id);
+const owned = { landlordId: { in: userIds } };
+const listings = [
+  ...new Set([...(ids?.listings ?? []), ...(await prisma.listing.findMany({ where: owned, select: { id: true } })).map((l) => l.id)]),
+];
+const properties = [
+  ...new Set([...(ids?.properties ?? []), ...(await prisma.property.findMany({ where: owned, select: { id: true } })).map((p) => p.id)]),
+];
 const payments = await prisma.payment.findMany({ where: { OR: [{ listingId: { in: listings } }, { tenantId: { in: userIds } }] }, select: { id: true } });
 const paymentIds = payments.map((p) => p.id);
 const disputes = await prisma.paymentDispute.findMany({ where: { paymentId: { in: paymentIds } }, select: { id: true } });
