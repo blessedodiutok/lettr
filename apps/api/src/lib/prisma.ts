@@ -1,0 +1,38 @@
+// File: apps/api/src/lib/prisma.ts
+// Prisma 7 requires the pg adapter when using the "client" engine type.
+// The connection URL comes from the DATABASE_URL environment variable
+// via the adapter — not passed directly to PrismaClient.
+
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+function createPrismaClient(): PrismaClient {
+  const connectionString = process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    throw new Error(
+      "DATABASE_URL environment variable is not set. " +
+        "Make sure apps/api/.env exists and contains DATABASE_URL.",
+    );
+  }
+
+  const adapter = new PrismaPg({ connectionString });
+
+  return new PrismaClient({
+    adapter,
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "error", "warn"]
+        : ["error"],
+  });
+}
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}

@@ -1,0 +1,75 @@
+/* File: packages/config/tailwind.base.css
+   Lettr design tokens as CSS custom properties — Tailwind v4 CSS-native config.
+   Import this file in each app's global CSS:
+     @import "@lettr/config/tailwind";
+   Then extend with app-specific tokens as needed.
+*/
+
+/* ── Brand colours ─────────────────────────────────────────────────────── */
+:root {
+  /* Primary — deep navy */
+  --lettr-primary-50: #eef3f8;
+  --lettr-primary-100: #d4e1ee;
+  --lettr-primary-200: #a9c3dd;
+  --lettr-primary-300: #7ea5cc;
+  --lettr-primary-400: #5387bb;
+  --lettr-primary-500: #2b6aa3;
+  --lettr-primary-600: #1a3c5e;
+  --lettr-primary-700: #153049;
+  --lettr-primary-800: #102436;
+  --lettr-primary-900: #0a1822;
+
+  /* Accent — warm gold */
+  --lettr-accent-50: #fef9ec;
+  --lettr-accent-100: #fcf0c9;
+  --lettr-accent-200: #f9e194;
+  --lettr-accent-300: #f6d25f;
+  --lettr-accent-400: #f3c22a;
+  --lettr-accent-500: #d4a017;
+  --lettr-accent-600: #a87c12;
+  --lettr-accent-700: #7c590d;
+
+  /* Semantic */
+  --lettr-success: #10b981;
+  --lettr-warning: #f59e0b;
+  --lettr-danger: #ef4444;
+
+  /* Neutrals */
+  --lettr-neutral-50: #fafaf7;
+  --lettr-neutral-100: #f1f5f9;
+  --lettr-neutral-200: #e2e8f0;
+  --lettr-neutral-300: #cbd5e1;
+  --lettr-neutral-400: #94a3b8;
+  --lettr-neutral-500: #64748b;
+  --lettr-neutral-600: #475569;
+  --lettr-neutral-700: #374151;
+  --lettr-neutral-800: #1e293b;
+  --lettr-neutral-900: #0f172a;
+
+  /* ── Typography ──────────────────────────────────────────────────────── */
+  --lettr-font-display: "Playfair Display", Georgia, serif;
+  --lettr-font-body: "DM Sans", system-ui, sans-serif;
+
+  /* ── Spacing ─────────────────────────────────────────────────────────── */
+  --lettr-space-xs: 4px;
+  --lettr-space-sm: 8px;
+  --lettr-space-md: 16px;
+  --lettr-space-lg: 24px;
+  --lettr-space-xl: 32px;
+  --lettr-space-2xl: 48px;
+  --lettr-space-3xl: 64px;
+
+  /* ── Border radius ───────────────────────────────────────────────────── */
+  --lettr-radius-sm: 4px;
+  --lettr-radius-md: 8px;
+  --lettr-radius-lg: 12px;
+  --lettr-radius-xl: 16px;
+  --lettr-radius-2xl: 24px;
+  --lettr-radius-full: 9999px;
+
+  /* ── Shadows ─────────────────────────────────────────────────────────── */
+  --lettr-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --lettr-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --lettr-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --lettr-shadow-card: 0 2px 8px 0 rgb(26 60 94 / 0.08);
+}

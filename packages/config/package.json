@@ -1,0 +1,23 @@
+{
+  "name": "@lettr/config",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "type": "module",
+  "main": "./tsconfig.base.json",
+  "exports": {
+    "./tsconfig": "./tsconfig.base.json",
+    "./eslint": "./eslint.config.base.js",
+    "./tailwind": "./tailwind.base.css"
+  },
+  "scripts": {
+    "lint": "echo 'No lint for config package'",
+    "clean": "echo 'Nothing to clean'"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

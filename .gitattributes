@@ -1,0 +1,23 @@
+# Normalise text files to LF in the repository so Windows, macOS and CI agree.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets — never diff or convert.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+# Lockfile: treat as generated so diffs stay readable.
+pnpm-lock.yaml linguist-generated=true -diff

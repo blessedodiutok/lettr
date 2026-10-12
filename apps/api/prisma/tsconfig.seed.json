@@ -1,0 +1,14 @@
+{
+  "extends": "../../../packages/config/tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@lettr/types": ["../../../packages/types/src/index.ts"],
+      "@lettr/zod-schemas": ["../../../packages/zod-schemas/src/index.ts"],
+      "@lettr/utils": ["../../../packages/utils/src/index.ts"]
+    }
+  },
+  "include": ["seed.ts"]
+}

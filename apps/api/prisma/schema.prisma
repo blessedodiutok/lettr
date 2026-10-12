@@ -1,0 +1,660 @@
+// File: apps/api/prisma/schema.prisma
+// Complete Lettr database schema — all models, enums, relations, and indexes
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum UserRole {
+    LANDLORD
+    TENANT
+    ADMIN
+}
+
+enum PropertyType {
+    SELF_CONTAINED // Single room with private bathroom — most common entry-level rental in Nigeria
+    MINI_FLAT // Living room + bedroom + kitchen + bathroom
+    ONE_BEDROOM // One bedroom flat
+    TWO_BEDROOM // Two bedroom flat
+    THREE_BEDROOM // Three bedroom flat
+    FOUR_BEDROOM // Four bedroom flat
+    DUPLEX // Two-storey house, typically 3–5 bedrooms
+    BUNGALOW // Single-storey detached house
+    BOYS_QUARTERS // BQ — staff/guest quarters, typically behind main house
+    MANSION // Large luxury property, 5+ bedrooms
+    PENTHOUSE // Top-floor luxury apartment
+    STUDIO // Open-plan single room with kitchenette
+    TERRACE // Row house / terraced property
+    SEMI_DETACHED // Semi-detached house
+    DETACHED // Fully detached house
+}
+
+enum ListingStatus {
+    DRAFT // Landlord is still filling in details — not visible to tenants
+    ACTIVE // Published and visible to all tenants
+    UNDER_OFFER // A tenant has paid — pending handover confirmation
+    TAKEN // Tenancy confirmed — removed from search results
+    SUSPENDED // Admin has suspended due to policy violation
+    ARCHIVED // Landlord has archived — no longer listed
+}
+
+enum PaymentStatus {
+    PENDING // Payment initiated but not yet confirmed by Paystack
+    PROCESSING // Paystack webhook received — escrow holding funds
+    IN_ESCROW // Funds held by Lettr — awaiting handover confirmation
+    RELEASED // Funds released to landlord after confirmed handover
+    FAILED // Payment failed at Paystack level
+    REFUNDED // Full refund issued to tenant
+    PARTIALLY_REFUNDED // Partial refund (e.g. caution fee dispute)
+}
+
+enum VerificationStatus {
+    UNVERIFIED // No documents submitted
+    PENDING_REVIEW // Documents uploaded — awaiting admin review
+    VERIFIED // Admin has approved — green badge shown
+    REJECTED // Admin rejected — reason stored in rejectionReason field
+}
+
+enum DisputeStatus {
+    OPEN
+    UNDER_REVIEW
+    RESOLVED
+    REJECTED
+}
+
+enum InquiryStatus {
+    OPEN // Tenant has sent initial inquiry
+    RESPONDED // Landlord has replied
+    INSPECTION_SCHEDULED // Inspection date/time set
+    INSPECTION_COMPLETED // Landlord marked inspection as done
+    OFFER_MADE // Landlord has offered the property to this tenant
+    ACCEPTED // Tenant has accepted the offer — awaiting payment
+    DECLINED // Either party declined
+    EXPIRED // No activity for 30 days — auto-closed
+}
+
+enum MaintenanceStatus {
+    OPEN // Tenant submitted request — not yet acknowledged
+    ACKNOWLEDGED // Landlord has seen and acknowledged the request
+    IN_PROGRESS // Landlord confirmed fix is underway
+    RESOLVED // Landlord marked as resolved
+    DISPUTED // Tenant disputes the resolution
+    CLOSED // Both parties confirmed resolved
+}
+
+enum AmenityType {
+    // Utilities
+    PREPAID_ELECTRICITY
+    POSTPAID_ELECTRICITY
+    CONSTANT_ELECTRICITY // Generator or solar backup
+    WATER_SUPPLY
+    BOREHOLE
+    INTERNET_FIBRE
+    INTERNET_CABLE
+    // Security
+    SECURITY_GUARD
+    CCTV
+    GATED_ESTATE
+    INTERCOM
+    // Facilities
+    PARKING_SPACE
+    SWIMMING_POOL
+    GYM
+    PLAYGROUND
+    GENERATOR_COMMON // Estate-wide generator
+    GENERATOR_PRIVATE // Dedicated generator for the unit
+    // Kitchen & Laundry
+    GAS_COOKER
+    WASHING_MACHINE_POINT
+    // Climate
+    AIR_CONDITIONING
+    CEILING_FAN
+    // External
+    GARDEN
+    BALCONY
+    ROOFTOP_TERRACE
+    SERVANTS_QUARTERS
+}
+
+enum NotificationType {
+    INQUIRY_RECEIVED // New inquiry from a tenant
+    INQUIRY_RESPONDED // Landlord replied to inquiry
+    INSPECTION_SCHEDULED // Inspection booking confirmed
+    INSPECTION_REMINDER // 24hr reminder before inspection
+    OFFER_MADE // Landlord offered property to tenant
+    PAYMENT_INITIATED // Payment started
+    PAYMENT_CONFIRMED // Paystack confirmed payment
+    FUNDS_IN_ESCROW // Escrow holding funds — awaiting handover
+    FUNDS_RELEASED // Rent transferred to landlord
+    PAYMENT_FAILED // Payment failed
+    HANDOVER_CONFIRMED // Property handed over — tenancy starts
+    AGREEMENT_READY // Tenancy agreement ready to sign
+    AGREEMENT_SIGNED // Both parties signed
+    MAINTENANCE_REQUEST // Tenant submitted maintenance request
+    MAINTENANCE_UPDATE // Landlord updated maintenance status
+    VERIFICATION_APPROVED // Profile verified by admin
+    VERIFICATION_REJECTED // Verification rejected with reason
+    REVIEW_RECEIVED // New review on a listing or profile
+    SYSTEM // Platform-wide announcements
+}
+
+// ─────────────────────────────────────────────
+// CORE USER MODEL
+// ─────────────────────────────────────────────
+
+model User {
+    id              String    @id @default(cuid())
+    email           String    @unique
+    phone           String?   @unique
+    passwordHash    String
+    role            UserRole
+    firstName       String
+    lastName        String
+    avatarUrl       String?
+    isEmailVerified Boolean   @default(false)
+    isPhoneVerified Boolean   @default(false)
+    isActive        Boolean   @default(true)
+    lastLoginAt     DateTime?
+    fcmTokens       String[] // Firebase Cloud Messaging tokens — one per device
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    // Relations
+    landlordProfile     LandlordProfile?
+    tenantProfile       TenantProfile?
+    listings            Listing[]              @relation("LandlordListings")
+    inquiriesAsTenant   Inquiry[]              @relation("TenantInquiries")
+    inquiriesAsLandlord Inquiry[]              @relation("LandlordInquiries")
+    tenanciesAsTenant   TenancyAgreement[]     @relation("TenantTenancies")
+    tenanciesAsLandlord TenancyAgreement[]     @relation("LandlordTenancies")
+    payments            Payment[]
+    reviewsGiven        Review[]               @relation("ReviewsGiven")
+    reviewsReceived     Review[]               @relation("ReviewsReceived")
+    savedListings       SavedListing[]
+    notifications       Notification[]
+    verificationDocs    VerificationDocument[]
+    documentsReviewed   VerificationDocument[] @relation("VerificationReviewer")
+    messages            Message[]
+    disputesOpened      PaymentDispute[]        @relation("DisputeOpenedBy")
+    disputesResolved    PaymentDispute[]        @relation("DisputeResolvedBy")
+    maintenanceRequests MaintenanceRequest[]
+    properties          Property[]             @relation("LandlordProperties")
+
+    @@index([email])
+    @@index([role])
+    @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// LANDLORD PROFILE
+// ─────────────────────────────────────────────
+
+model LandlordProfile {
+    id                     String             @id @default(cuid())
+    userId                 String             @unique
+    user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_landlord_profile_user")
+    businessName           String? // Optional: if renting as a company/agency
+    bio                    String?
+    verificationStatus     VerificationStatus @default(UNVERIFIED)
+    verifiedAt             DateTime?
+    rejectionReason        String?
+    totalListings          Int                @default(0)
+    totalRentalsCompleted  Int                @default(0)
+    averageRating          Float              @default(0)
+    totalReviews           Int                @default(0)
+    bankAccountName        String?
+    bankAccountNumber      String?
+    bankCode               String? // Paystack bank code for disbursement
+    paystackSubAccountCode String? // Paystack subaccount for split payments
+    createdAt              DateTime           @default(now())
+    updatedAt              DateTime           @updatedAt
+
+    @@index([verificationStatus])
+    @@map("landlord_profiles")
+}
+
+// ─────────────────────────────────────────────
+// TENANT SCREENING PROFILE
+// ─────────────────────────────────────────────
+
+model TenantProfile {
+    id                String   @id @default(cuid())
+    userId            String   @unique
+    user              User     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_tenant_profile_user")
+    occupation        String?
+    employerName      String?
+    monthlyIncome     Decimal? @db.Decimal(14, 2) // In Naira — used for affordability screening
+    numberOfOccupants Int? // How many people will live in the property
+    hasPets           Boolean  @default(false)
+    petDescription    String?
+    smokingHousehold  Boolean  @default(false)
+    previousAddress   String?
+    reasonForMoving   String?
+    nextOfKinName     String?
+    nextOfKinPhone    String?
+    nextOfKinRelation String?
+    averageRating     Float    @default(0)
+    totalReviews      Int      @default(0)
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @updatedAt
+
+    @@map("tenant_profiles")
+}
+
+// ─────────────────────────────────────────────
+// PROPERTY
+// ─────────────────────────────────────────────
+
+model Property {
+    id            String          @id @default(cuid())
+    landlordId    String
+    landlord      User            @relation("LandlordProperties", fields: [landlordId], references: [id], onDelete: Restrict, map: "fk_property_landlord")
+    title         String
+    description   String
+    propertyType  PropertyType
+    address       String
+    neighbourhood String
+    lga           String // Local Government Area — Nigerian administrative unit below state
+    state         String // Nigerian state: Lagos, Abuja (FCT), Rivers, etc.
+    latitude      Float?
+    longitude     Float?
+    bedrooms      Int             @default(0) // 0 = self-contained/studio
+    bathrooms     Int             @default(1)
+    toilets       Int             @default(1)
+    parkingSpaces Int             @default(0)
+    sizeInSqm     Float?
+    isFurnished   Boolean         @default(false)
+    isServiced    Boolean         @default(false) // Estate management handles utilities/maintenance
+    isNewBuild    Boolean         @default(false)
+    yearBuilt     Int?
+    photos        PropertyPhoto[]
+    amenities     Amenity[]
+    listings      Listing[]
+    createdAt     DateTime        @default(now())
+    updatedAt     DateTime        @updatedAt
+
+    @@index([state])
+    @@index([lga])
+    @@index([neighbourhood])
+    @@index([propertyType])
+    @@index([landlordId])
+    @@map("properties")
+}
+
+// ─────────────────────────────────────────────
+// PROPERTY PHOTOS
+// ─────────────────────────────────────────────
+
+model PropertyPhoto {
+    id           String   @id @default(cuid())
+    propertyId   String
+    property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, map: "fk_photo_property")
+    url          String // Cloudinary URL
+    publicId     String // Cloudinary public_id — needed to delete the image
+    altText      String?
+    isCover      Boolean  @default(false) // The main thumbnail shown on listing cards
+    displayOrder Int      @default(0) // Controls photo gallery sequence
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@index([propertyId])
+    @@map("property_photos")
+}
+
+// ─────────────────────────────────────────────
+// AMENITIES
+// ─────────────────────────────────────────────
+
+model Amenity {
+    id         String      @id @default(cuid())
+    propertyId String
+    property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade, map: "fk_amenity_property")
+    type       AmenityType
+    notes      String? // Optional detail: "24/7 generator" vs "8hrs/day generator"
+    createdAt  DateTime    @default(now())
+    updatedAt  DateTime    @updatedAt
+
+    @@unique([propertyId, type], map: "uq_amenity_property_type")
+    @@index([propertyId])
+    @@map("amenities")
+}
+
+// ─────────────────────────────────────────────
+// LISTING
+// A Listing is a Property + its current rental terms (price, availability)
+// A property can have multiple listings over time (re-listed after a tenancy ends)
+// ─────────────────────────────────────────────
+
+model Listing {
+    id                     String             @id @default(cuid())
+    propertyId             String
+    property               Property           @relation(fields: [propertyId], references: [id], onDelete: Restrict, map: "fk_listing_property")
+    landlordId             String
+    landlord               User               @relation("LandlordListings", fields: [landlordId], references: [id], onDelete: Restrict, map: "fk_listing_landlord")
+    status                 ListingStatus      @default(DRAFT)
+    annualRent             Decimal            @db.Decimal(14, 2) // In Naira — always annual, never monthly
+    cautionFee             Decimal            @db.Decimal(14, 2) // Refundable deposit
+    agencyFee              Decimal            @default(0) @db.Decimal(14, 2)
+    serviceCharge          Decimal            @default(0) @db.Decimal(14, 2)
+    legalFee               Decimal            @default(0) @db.Decimal(14, 2)
+    availableFrom          DateTime
+    minimumLeaseTerm       Int                @default(12) // Months
+    maximumOccupants       Int?
+    petsAllowed            Boolean            @default(false)
+    smokingAllowed         Boolean            @default(false)
+    viewCount              Int                @default(0)
+    publishedAt            DateTime?
+    takenAt                DateTime?
+    // Tenant screening requirements
+    requiresEmployment     Boolean            @default(false)
+    requiresGuarantor      Boolean            @default(false)
+    additionalRequirements String?
+    inquiries              Inquiry[]
+    tenancyAgreements      TenancyAgreement[]
+    payments               Payment[]
+    reviews                Review[]
+    savedBy                SavedListing[]
+    createdAt              DateTime           @default(now())
+    updatedAt              DateTime           @updatedAt
+
+    @@index([status])
+    @@index([annualRent])
+    @@index([landlordId])
+    @@index([propertyId])
+    @@index([availableFrom])
+    @@map("listings")
+}
+
+// ─────────────────────────────────────────────
+// INQUIRY
+// A message thread between a tenant and landlord about a specific listing
+// ─────────────────────────────────────────────
+
+model Inquiry {
+    id                String             @id @default(cuid())
+    listingId         String
+    listing           Listing            @relation(fields: [listingId], references: [id], onDelete: Restrict, map: "fk_inquiry_listing")
+    tenantId          String
+    tenant            User               @relation("TenantInquiries", fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_inquiry_tenant")
+    landlordId        String
+    landlord          User               @relation("LandlordInquiries", fields: [landlordId], references: [id], onDelete: Restrict, map: "fk_inquiry_landlord")
+    status            InquiryStatus      @default(OPEN)
+    initialMessage    String // Tenant's first message
+    messages          Message[]
+    inspectionBooking InspectionBooking?
+    createdAt         DateTime           @default(now())
+    updatedAt         DateTime           @updatedAt
+
+    @@unique([listingId, tenantId], map: "uq_inquiry_listing_tenant")
+    @@index([listingId])
+    @@index([tenantId])
+    @@index([landlordId])
+    @@index([status])
+    @@map("inquiries")
+}
+
+model Message {
+    id        String   @id @default(cuid())
+    inquiryId String
+    inquiry   Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade, map: "fk_message_inquiry")
+    senderId  String
+    sender    User     @relation(fields: [senderId], references: [id], onDelete: Restrict, map: "fk_message_sender")
+    body      String
+    readAt    DateTime?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([inquiryId, createdAt])
+    @@index([senderId])
+    @@map("messages")
+}
+
+// ─────────────────────────────────────────────
+// INSPECTION BOOKING
+// ─────────────────────────────────────────────
+
+model InspectionBooking {
+    id                 String   @id @default(cuid())
+    inquiryId          String   @unique
+    inquiry            Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade, map: "fk_inspection_inquiry")
+    scheduledAt        DateTime
+    notes              String?
+    isConfirmed        Boolean  @default(false)
+    isCompleted        Boolean  @default(false)
+    cancellationReason String?
+    createdAt          DateTime @default(now())
+    updatedAt          DateTime @updatedAt
+
+    @@index([scheduledAt])
+    @@map("inspection_bookings")
+}
+
+// ─────────────────────────────────────────────
+// TENANCY AGREEMENT
+// ─────────────────────────────────────────────
+
+model TenancyAgreement {
+    id                  String    @id @default(cuid())
+    listingId           String
+    listing             Listing   @relation(fields: [listingId], references: [id], onDelete: Restrict, map: "fk_tenancy_listing")
+    tenantId            String
+    tenant              User      @relation("TenantTenancies", fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_tenancy_tenant")
+    landlordId          String
+    landlord            User      @relation("LandlordTenancies", fields: [landlordId], references: [id], onDelete: Restrict, map: "fk_tenancy_landlord")
+    agreementText       String // Full legal text of the tenancy agreement
+    documentUrl         String? // Cloudinary URL of signed PDF
+    tenantSignedAt      DateTime?
+    landlordSignedAt    DateTime?
+    tenancyStartDate    DateTime?
+    tenancyEndDate      DateTime?
+    handoverConfirmedAt DateTime?
+    isHandoverConfirmed Boolean   @default(false)
+    payments            Payment[]
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+
+    @@index([tenantId])
+    @@index([landlordId])
+    @@index([listingId])
+    @@unique([listingId, tenantId], map: "uq_tenancy_listing_tenant")
+    @@map("tenancy_agreements")
+}
+
+// ─────────────────────────────────────────────
+// PAYMENT
+// ─────────────────────────────────────────────
+
+model Payment {
+    id                  String            @id @default(cuid())
+    listingId           String
+    listing             Listing           @relation(fields: [listingId], references: [id], onDelete: Restrict, map: "fk_payment_listing")
+    tenantId            String
+    tenant              User              @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_payment_tenant")
+    tenancyAgreementId  String?
+    tenancyAgreement    TenancyAgreement? @relation(fields: [tenancyAgreementId], references: [id], map: "fk_payment_tenancy")
+    status              PaymentStatus     @default(PENDING)
+    annualRent          Decimal           @db.Decimal(14, 2)
+    cautionFee          Decimal           @db.Decimal(14, 2)
+    platformFee         Decimal           @db.Decimal(14, 2)
+    agentFeeSaved       Decimal           @db.Decimal(14, 2)
+    totalAmount         Decimal           @db.Decimal(14, 2)
+    currency            String            @default("NGN")
+    paystackReference   String?           @unique // Paystack transaction reference
+    paystackAccessCode  String? // Used to initialise the Paystack payment modal
+    paystackWebhookData Json? // Raw webhook payload stored for audit
+    escrowReleasedAt    DateTime?
+    paystackTransferCode String?          @unique
+    transferReference    String?          @unique
+    refundedAt          DateTime?
+    refundReason        String?
+    receipt             Receipt?
+    disputes            PaymentDispute[]
+    createdAt           DateTime          @default(now())
+    updatedAt           DateTime          @updatedAt
+
+    @@index([tenantId])
+    @@index([listingId])
+    @@index([status])
+    @@index([paystackReference])
+    @@map("payments")
+}
+
+model PaymentDispute {
+    id           String        @id @default(cuid())
+    paymentId    String
+    payment      Payment       @relation(fields: [paymentId], references: [id], onDelete: Restrict, map: "fk_dispute_payment")
+    openedById   String
+    openedBy     User          @relation("DisputeOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+    reason       String
+    status       DisputeStatus @default(OPEN)
+    resolution   String?
+    resolvedById String?
+    resolvedBy   User?         @relation("DisputeResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+    resolvedAt   DateTime?
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+
+    @@index([paymentId])
+    @@index([status])
+    @@map("payment_disputes")
+}
+
+// ─────────────────────────────────────────────
+// RECEIPT
+// ─────────────────────────────────────────────
+
+model Receipt {
+    id            String   @id @default(cuid())
+    paymentId     String   @unique
+    payment       Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade, map: "fk_receipt_payment")
+    receiptNumber String   @unique // LTR-2024-000001 format
+    documentUrl   String? // Cloudinary URL of PDF receipt
+    issuedAt      DateTime @default(now())
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    @@map("receipts")
+}
+
+// ─────────────────────────────────────────────
+// MAINTENANCE REQUEST
+// ─────────────────────────────────────────────
+
+model MaintenanceRequest {
+    id              String            @id @default(cuid())
+    tenantId        String
+    tenant          User              @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_maintenance_tenant")
+    propertyAddress String
+    category        String // e.g. "Plumbing", "Electrical", "Structural"
+    description     String
+    photoUrls       String[] // Cloudinary URLs of issue photos
+    status          MaintenanceStatus @default(OPEN)
+    landlordNotes   String?
+    resolvedAt      DateTime?
+    createdAt       DateTime          @default(now())
+    updatedAt       DateTime          @updatedAt
+
+    @@index([tenantId])
+    @@index([status])
+    @@map("maintenance_requests")
+}
+
+// ─────────────────────────────────────────────
+// REVIEW
+// ─────────────────────────────────────────────
+
+model Review {
+    id         String   @id @default(cuid())
+    listingId  String?
+    listing    Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull, map: "fk_review_listing")
+    reviewerId String
+    reviewer   User     @relation("ReviewsGiven", fields: [reviewerId], references: [id], onDelete: Restrict, map: "fk_review_reviewer")
+    revieweeId String
+    reviewee   User     @relation("ReviewsReceived", fields: [revieweeId], references: [id], onDelete: Restrict, map: "fk_review_reviewee")
+    rating     Int // 1–5 stars
+    title      String
+    body       String
+    isVerified Boolean  @default(false) // True only if reviewer completed a tenancy
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+
+    @@index([listingId])
+    @@index([revieweeId])
+    @@index([reviewerId])
+    @@unique([reviewerId, revieweeId, listingId], map: "uq_review_parties_listing")
+    @@map("reviews")
+}
+
+// ─────────────────────────────────────────────
+// SAVED LISTING (Favourites)
+// ─────────────────────────────────────────────
+
+model SavedListing {
+    id        String   @id @default(cuid())
+    userId    String
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_saved_user")
+    listingId String
+    listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade, map: "fk_saved_listing")
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([userId, listingId], map: "uq_saved_user_listing")
+    @@index([userId])
+    @@map("saved_listings")
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATION
+// ─────────────────────────────────────────────
+
+model Notification {
+    id        String           @id @default(cuid())
+    userId    String
+    user      User             @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_notification_user")
+    type      NotificationType
+    title     String
+    body      String
+    data      Json? // Extra context: { listingId, inquiryId, paymentId, etc. }
+    isRead    Boolean          @default(false)
+    readAt    DateTime?
+    createdAt DateTime         @default(now())
+    updatedAt DateTime         @updatedAt
+
+    @@index([userId])
+    @@index([isRead])
+    @@index([createdAt])
+    @@map("notifications")
+}
+
+// ─────────────────────────────────────────────
+// VERIFICATION DOCUMENT
+// ─────────────────────────────────────────────
+
+model VerificationDocument {
+    id              String             @id @default(cuid())
+    userId          String
+    user            User               @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_verification_user")
+    documentType    String // "NIN", "BVN", "PASSPORT", "DRIVERS_LICENSE", "CAC_CERT", etc.
+    documentNumber  String? // The ID number on the document
+    documentUrl     String // Cloudinary URL of the uploaded document image/PDF
+    publicId        String // Cloudinary public_id for deletion
+    status          VerificationStatus @default(PENDING_REVIEW)
+    reviewedAt      DateTime?
+    reviewedBy      String? // Admin user ID who reviewed
+    reviewer        User?              @relation("VerificationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+    rejectionReason String?
+    createdAt       DateTime           @default(now())
+    updatedAt       DateTime           @updatedAt
+
+    @@index([userId])
+    @@index([status])
+    @@map("verification_documents")
+}

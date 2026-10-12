@@ -1,0 +1,43 @@
+{
+  "extends": "../../packages/config/tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "esnext"
+    ],
+    "allowJs": true,
+    "jsx": "react-native",
+    "module": "commonjs",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@lettr/types": [
+        "../../packages/types/src/index.ts"
+      ],
+      "@lettr/zod-schemas": [
+        "../../packages/zod-schemas/src/index.ts"
+      ],
+      "@lettr/utils": [
+        "../../packages/utils/src/index.ts"
+      ],
+      "@lettr/config": [
+        "../../packages/config"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "nativewind-env.d.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

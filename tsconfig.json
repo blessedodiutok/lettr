@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "moduleResolution": "bundler",
+    "jsx": "preserve"
+  },
+  "files": [],
+  "references": [{ "path": "apps/web" }, { "path": "apps/api" }]
+}

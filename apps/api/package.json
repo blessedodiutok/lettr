@@ -1,0 +1,71 @@
+{
+  "name": "@lettr/api",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "nodemon --config nodemon.json",
+    "build": "tsc --project tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "db:seed": "prisma db seed",
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@lettr/types": "workspace:*",
+    "@lettr/utils": "workspace:*",
+    "@lettr/zod-schemas": "workspace:*",
+    "@prisma/adapter-pg": "7.8.0",
+    "@prisma/client": "7.8.0",
+    "@prisma/config": "7.8.0",
+    "axios": "1.16.1",
+    "bcryptjs": "3.0.3",
+    "cloudinary": "2.10.0",
+    "cookie-parser": "1.4.7",
+    "cors": "2.8.6",
+    "dotenv": "16.5.0",
+    "express": "5.2.1",
+    "express-rate-limit": "8.5.2",
+    "firebase-admin": "13.10.0",
+    "helmet": "8.2.0",
+    "ioredis": "5.11.0",
+    "jsonwebtoken": "9.0.3",
+    "morgan": "1.10.1",
+    "multer": "2.1.1",
+    "nodemailer": "8.0.9",
+    "pg": "8.21.0",
+    "resend": "6.12.4",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "3.0.0",
+    "@types/cookie-parser": "1.4.10",
+    "@types/cors": "2.8.19",
+    "@types/express": "5.0.6",
+    "@types/jsonwebtoken": "9.0.10",
+    "@types/morgan": "1.9.10",
+    "@types/multer": "2.1.0",
+    "@types/nodemailer": "8.0.0",
+    "@types/pg": "8.20.0",
+    "@vitest/coverage-v8": "4.1.7",
+    "nodemon": "3.1.14",
+    "prisma": "7.8.0",
+    "tsx": "4.22.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.7"
+  },
+  "prisma": {
+    "seed": "tsx --tsconfig prisma/tsconfig.seed.json prisma/seed.ts"
+  }
+}

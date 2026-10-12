@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+.next/
+out/
+.expo/
+build/
+
+# Turborepo cache
+.turbo/
+
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Prisma
+prisma/migrations/*.sql.bak
+
+# TypeScript
+*.tsbuildinfo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+logs/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Expo / EAS
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+.expo-shared/
+
+# VS Code
+.vscode/settings.json.bak
+
+# Vercel
+.vercel/
+
+# Misc
+*.pem
+.cache/
+tmp/
