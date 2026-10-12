@@ -1,8 +1,8 @@
 // File: packages/zod-schemas/src/index.ts
-// All Zod 4 validation schemas for every API request body.
-// Used by: API (middleware/validate.ts) and web/mobile (react-hook-form resolvers).
-// Grouped by domain: auth, listings, payments, tenancy, reviews, inquiries, users.
+// Zod 4 validation schemas for every API request.
+// Used by the API (middleware/validate.ts) and by web and mobile forms.
 
+import { AmenityType, NIGERIAN_STATES, PropertyType } from '@lettr/types';
 import { z } from 'zod';
 
 // ─────────────────────────────────────────────
@@ -11,10 +11,8 @@ import { z } from 'zod';
 
 const NigerianPhone = z
   .string()
-  .regex(
-    /^(\+234|0)(7|8|9)(0|1)\d{8}$/,
-    'Enter a valid Nigerian phone number (e.g. +2348012345678)',
-  )
+  .trim()
+  .regex(/^(\+234|0)(7|8|9)(0|1)\d{8}$/, 'Enter a valid Nigerian phone number, e.g. 08012345678')
   .optional();
 
 const NairaAmount = z
@@ -24,135 +22,109 @@ const NairaAmount = z
 
 const CuidId = z.string().min(1, 'ID is required');
 
-const NigerianState = z.enum([
-  'Lagos',
-  'Abuja (FCT)',
-  'Rivers',
-  'Kano',
-  'Oyo',
-  'Delta',
-  'Anambra',
-  'Enugu',
-  'Imo',
-  'Kaduna',
-  'Ogun',
-  'Edo',
-  'Kwara',
-  'Cross River',
-  'Akwa Ibom',
-  'Borno',
-  'Katsina',
-  'Sokoto',
-  'Niger',
-  'Plateau',
-  'Benue',
-  'Nassarawa',
-  'Zamfara',
-  'Kebbi',
-  'Jigawa',
-  'Gombe',
-  'Bauchi',
-  'Yobe',
-  'Adamawa',
-  'Taraba',
-  'Ebonyi',
-  'Ekiti',
-  'Ondo',
-  'Osun',
-  'Bayelsa',
-]);
+export const NigerianStateSchema = z.enum(NIGERIAN_STATES, { message: 'Choose a state' });
+
+export const PasswordSchema = z
+  .string()
+  .min(8, 'Use at least 8 characters')
+  .max(72, 'Use at most 72 characters')
+  .regex(/[A-Za-z]/, 'Include at least one letter')
+  .regex(/\d/, 'Include at least one number');
+
+const Email = z.string().trim().toLowerCase().email('Enter a valid email address');
+
+/** Query-string integer with bounds, e.g. ?page=2 */
+const queryInt = (fallback: number, max = Number.MAX_SAFE_INTEGER) =>
+  z
+    .string()
+    .regex(/^\d+$/, 'Must be a whole number')
+    .transform(Number)
+    .pipe(z.number().int().min(0).max(max))
+    .optional()
+    .transform((value) => value ?? fallback);
+
+/** Optional query-string integer — absent stays undefined. */
+const queryIntOptional = (max = Number.MAX_SAFE_INTEGER) =>
+  z
+    .string()
+    .regex(/^\d+$/, 'Must be a whole number')
+    .transform(Number)
+    .pipe(z.number().int().min(0).max(max))
+    .optional();
+
+const queryBool = z
+  .enum(['true', 'false'])
+  .transform((v) => v === 'true')
+  .optional();
+
+export const PaginationQuerySchema = z.object({
+  page: queryInt(1).transform((v) => Math.max(1, v)),
+  limit: queryInt(20, 50).transform((v) => Math.max(1, v)),
+});
 
 // ─────────────────────────────────────────────
-// AUTH SCHEMAS
+// AUTH
 // ─────────────────────────────────────────────
 
 export const SignupSchema = z.object({
-  email: z.string().email('Enter a valid email address').toLowerCase().trim(),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(72, 'Password must be at most 72 characters'),
-  firstName: z
-    .string()
-    .min(2, 'First name must be at least 2 characters')
-    .max(50, 'First name must be at most 50 characters')
-    .trim(),
-  lastName: z
-    .string()
-    .min(2, 'Last name must be at least 2 characters')
-    .max(50, 'Last name must be at most 50 characters')
-    .trim(),
-  role: z.enum(['LANDLORD', 'TENANT'], {
-    message: 'Role must be LANDLORD or TENANT',
-  }),
-  phone: NigerianPhone,
+  email: Email,
+  password: PasswordSchema,
+  firstName: z.string().trim().min(2, 'Enter at least 2 characters').max(50),
+  lastName: z.string().trim().min(2, 'Enter at least 2 characters').max(50),
+  role: z.enum(['LANDLORD', 'TENANT'], { message: 'Choose whether you are renting or letting' }),
+  phone: NigerianPhone.or(z.literal('').transform(() => undefined)),
 });
-
 export type SignupInput = z.infer<typeof SignupSchema>;
 
 export const LoginSchema = z.object({
-  email: z.string().email('Enter a valid email address').toLowerCase().trim(),
-  password: z.string().min(1, 'Password is required'),
+  email: Email,
+  password: z.string().min(1, 'Enter your password'),
 });
-
 export type LoginInput = z.infer<typeof LoginSchema>;
 
 export const VerifyOtpSchema = z.object({
   userId: CuidId,
-  otp: z
-    .string()
-    .length(6, 'Verification code must be exactly 6 digits')
-    .regex(/^\d{6}$/, 'Verification code must contain only digits'),
+  otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
 });
-
 export type VerifyOtpInput = z.infer<typeof VerifyOtpSchema>;
+
+export const ResendOtpSchema = z.object({ userId: CuidId });
 
 export const RefreshTokenSchema = z.object({
   refreshToken: z.string().min(1).optional(),
 });
 
+export const ForgotPasswordSchema = z.object({ email: Email });
+
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(20, 'This reset link is invalid'),
+  password: PasswordSchema,
+});
+
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Enter your current password'),
+  newPassword: PasswordSchema,
+});
+
 export const FcmTokenSchema = z.object({
-  token: z.string().min(1, 'FCM token is required'),
+  token: z.string().min(1, 'A device token is required'),
 });
 
 // ─────────────────────────────────────────────
-// LISTING SCHEMAS
+// LISTINGS
 // ─────────────────────────────────────────────
 
-const PropertyTypeEnum = z.enum([
-  'SELF_CONTAINED',
-  'MINI_FLAT',
-  'ONE_BEDROOM',
-  'TWO_BEDROOM',
-  'THREE_BEDROOM',
-  'FOUR_BEDROOM',
-  'DUPLEX',
-  'BUNGALOW',
-  'BOYS_QUARTERS',
-  'MANSION',
-  'PENTHOUSE',
-  'STUDIO',
-  'TERRACE',
-  'SEMI_DETACHED',
-  'DETACHED',
-]);
+export const PropertyTypeSchema = z.enum(PropertyType);
+export const AmenityTypeSchema = z.enum(AmenityType);
 
 const PropertySchema = z.object({
-  title: z
-    .string()
-    .min(10, 'Title must be at least 10 characters')
-    .max(120, 'Title must be at most 120 characters')
-    .trim(),
-  description: z
-    .string()
-    .min(50, 'Description must be at least 50 characters')
-    .max(2000, 'Description must be at most 2000 characters')
-    .trim(),
-  propertyType: PropertyTypeEnum,
-  address: z.string().min(5, 'Address is required').trim(),
-  neighbourhood: z.string().min(2, 'Neighbourhood is required').trim(),
-  lga: z.string().min(2, 'LGA is required').trim(),
-  state: NigerianState,
+  title: z.string().trim().min(10, 'Use at least 10 characters').max(120, 'Use at most 120 characters'),
+  description: z.string().trim().min(50, 'Describe the home in at least 50 characters').max(2000),
+  propertyType: PropertyTypeSchema,
+  address: z.string().trim().min(5, 'Enter the street address'),
+  neighbourhood: z.string().trim().min(2, 'Enter the neighbourhood'),
+  lga: z.string().trim().min(2, 'Enter the local government area'),
+  state: NigerianStateSchema,
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   bedrooms: z.number().int().min(0).max(20),
@@ -163,28 +135,19 @@ const PropertySchema = z.object({
   isFurnished: z.boolean().default(false),
   isServiced: z.boolean().default(false),
   isNewBuild: z.boolean().default(false),
-  yearBuilt: z
-    .number()
-    .int()
-    .min(1900)
-    .max(new Date().getFullYear())
-    .optional(),
+  yearBuilt: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
   amenities: z
-    .array(
-      z.object({
-        type: z.string(),
-        notes: z.string().optional(),
-      }),
-    )
+    .array(z.object({ type: AmenityTypeSchema, notes: z.string().max(120).optional() }))
+    .max(40)
     .optional(),
 });
 
 const ListingTermsSchema = z.object({
   annualRent: NairaAmount.min(100000, 'Annual rent must be at least ₦100,000'),
-  cautionFee: NairaAmount,
+  cautionFee: z.number().min(0, 'Must be zero or more'),
   serviceCharge: z.number().min(0).default(0),
   legalFee: z.number().min(0).default(0),
-  availableFrom: z.string().datetime({ message: 'availableFrom must be a valid ISO date' }),
+  availableFrom: z.string().datetime({ message: 'Choose the date the home is available' }),
   minimumLeaseTerm: z.number().int().min(1).max(36).default(12),
   maximumOccupants: z.number().int().positive().optional(),
   petsAllowed: z.boolean().default(false),
@@ -198,270 +161,186 @@ export const CreateListingSchema = z.object({
   property: PropertySchema,
   listing: ListingTermsSchema,
 });
-
 export type CreateListingInput = z.infer<typeof CreateListingSchema>;
 
 export const UpdateListingSchema = z.object({
   property: PropertySchema.partial().optional(),
   listing: ListingTermsSchema.partial().optional(),
 });
-
 export type UpdateListingInput = z.infer<typeof UpdateListingSchema>;
 
 export const ListingSearchSchema = z.object({
-  state: z.string().optional(),
-  lga: z.string().optional(),
-  neighbourhood: z.string().optional(),
-  propertyType: PropertyTypeEnum.optional(),
-  minRent: z
-    .string()
-    .regex(/^\d+$/, 'minRent must be a number')
-    .transform(Number)
-    .optional(),
-  maxRent: z
-    .string()
-    .regex(/^\d+$/, 'maxRent must be a number')
-    .transform(Number)
-    .optional(),
-  bedrooms: z
-    .string()
-    .regex(/^\d+$/, 'bedrooms must be a number')
-    .transform(Number)
-    .optional(),
-  isFurnished: z
-    .string()
-    .transform((v) => v === 'true')
-    .optional(),
-  isServiced: z
-    .string()
-    .transform((v) => v === 'true')
-    .optional(),
-  page: z
-    .string()
-    .regex(/^\d+$/)
-    .transform(Number)
-    .default(1),
-  limit: z
-    .string()
-    .regex(/^\d+$/)
-    .transform(Number)
-    .default(20),
-  sortBy: z
-    .enum(['popular', 'price_asc', 'price_desc', 'newest'])
-    .default('popular'),
+  q: z.string().trim().max(80).optional(),
+  state: z.string().max(40).optional(),
+  lga: z.string().max(60).optional(),
+  neighbourhood: z.string().max(60).optional(),
+  propertyType: PropertyTypeSchema.optional(),
+  minRent: queryIntOptional(),
+  maxRent: queryIntOptional(),
+  /** Minimum number of bedrooms. */
+  bedrooms: queryIntOptional(20),
+  isFurnished: queryBool,
+  isServiced: queryBool,
+  page: queryInt(1).transform((v) => Math.max(1, v)),
+  limit: queryInt(20, 50).transform((v) => Math.max(1, v)),
+  sortBy: z.enum(['popular', 'price_asc', 'price_desc', 'newest']).default('newest'),
 });
-
 export type ListingSearchInput = z.infer<typeof ListingSearchSchema>;
 
+export const ReorderPhotosSchema = z.object({
+  photoIds: z.array(CuidId).min(1).max(12),
+});
+
 // ─────────────────────────────────────────────
-// INQUIRY SCHEMAS
+// INQUIRIES, INSPECTIONS AND OFFERS
 // ─────────────────────────────────────────────
 
 export const CreateInquirySchema = z.object({
   listingId: CuidId,
-  message: z
-    .string()
-    .min(20, 'Message must be at least 20 characters')
-    .max(1000, 'Message must be at most 1000 characters')
-    .trim(),
+  message: z.string().trim().min(20, 'Write at least 20 characters so the landlord knows who you are').max(1000),
 });
-
 export type CreateInquiryInput = z.infer<typeof CreateInquirySchema>;
 
 export const SendMessageSchema = z.object({
-  message: z
-    .string()
-    .min(1, 'Message cannot be empty')
-    .max(1000, 'Message must be at most 1000 characters')
-    .trim(),
+  message: z.string().trim().min(1, 'Message cannot be empty').max(1000, 'Keep messages under 1000 characters'),
 });
-
 export type SendMessageInput = z.infer<typeof SendMessageSchema>;
 
 export const ScheduleInspectionSchema = z.object({
   scheduledAt: z
     .string()
-    .datetime({ message: 'scheduledAt must be a valid ISO datetime' })
-    .refine(
-      (val) => new Date(val) > new Date(),
-      'Inspection must be scheduled in the future',
-    ),
+    .datetime({ message: 'Choose a date and time' })
+    .refine((val) => new Date(val) > new Date(), 'Choose a time in the future'),
   notes: z.string().max(500).optional(),
 });
-
 export type ScheduleInspectionInput = z.infer<typeof ScheduleInspectionSchema>;
 
-export const UpdateInquiryStatusSchema = z.object({
-  status: z.enum([
-    'RESPONDED',
-    'INSPECTION_SCHEDULED',
-    'INSPECTION_COMPLETED',
-    'OFFER_MADE',
-    'ACCEPTED',
-    'DECLINED',
-  ]),
+export const MakeOfferSchema = z.object({
+  note: z.string().trim().max(500).optional(),
+});
+
+export const CloseInquirySchema = z.object({
+  reason: z.string().trim().max(300).optional(),
 });
 
 // ─────────────────────────────────────────────
-// TENANCY SCHEMAS
+// TENANCY
 // ─────────────────────────────────────────────
 
-export const CreateTenancyAgreementSchema = z.object({
-  listingId: CuidId,
-  tenantId: CuidId,
-  tenancyStartDate: z
-    .string()
-    .datetime({ message: 'tenancyStartDate must be a valid ISO datetime' }),
-  paymentId: CuidId.optional(),
+export const CancelTenancySchema = z.object({
+  reason: z.string().trim().min(10, 'Tell us briefly why').max(500),
 });
 
-export type CreateTenancyAgreementInput = z.infer<
-  typeof CreateTenancyAgreementSchema
->;
-
 // ─────────────────────────────────────────────
-// PAYMENT SCHEMAS
+// PAYMENTS
 // ─────────────────────────────────────────────
 
 export const InitiatePaymentSchema = z.object({
   listingId: CuidId,
 });
-
 export type InitiatePaymentInput = z.infer<typeof InitiatePaymentSchema>;
 
-export const PaystackWebhookSchema = z.object({
-  event: z.string(),
-  data: z.object({
-    reference: z.string(),
-    status: z.string(),
-    amount: z.number(),
-    currency: z.string(),
-    metadata: z
-      .object({
-        paymentId: z.string().optional(),
-      })
-      .optional(),
-  }),
+export const RefundPaymentSchema = z.object({
+  amount: z.number().positive().optional(),
+  reason: z.string().trim().min(10).max(500),
+});
+
+export const CreateDisputeSchema = z.object({
+  reason: z.string().trim().min(20, 'Describe the problem in at least 20 characters').max(1000),
+});
+
+export const ResolveDisputeSchema = z.object({
+  status: z.enum(['RESOLVED', 'REJECTED']),
+  outcome: z.enum(['REFUND_TENANT', 'RELEASE_TO_LANDLORD', 'NO_ACTION']).default('NO_ACTION'),
+  resolution: z.string().trim().min(10).max(1000),
 });
 
 // ─────────────────────────────────────────────
-// REVIEW SCHEMAS
+// REVIEWS
 // ─────────────────────────────────────────────
 
 export const CreateReviewSchema = z.object({
   listingId: CuidId.optional(),
   revieweeId: CuidId,
-  rating: z
-    .number()
-    .int()
-    .min(1, 'Rating must be at least 1')
-    .max(5, 'Rating must be at most 5'),
-  title: z
-    .string()
-    .min(5, 'Title must be at least 5 characters')
-    .max(100, 'Title must be at most 100 characters')
-    .trim(),
-  body: z
-    .string()
-    .min(20, 'Review must be at least 20 characters')
-    .max(1000, 'Review must be at most 1000 characters')
-    .trim(),
+  rating: z.number().int().min(1, 'Choose a rating').max(5),
+  title: z.string().trim().min(5, 'Use at least 5 characters').max(100),
+  body: z.string().trim().min(20, 'Write at least 20 characters').max(1000),
 });
-
 export type CreateReviewInput = z.infer<typeof CreateReviewSchema>;
 
 // ─────────────────────────────────────────────
-// USER / PROFILE SCHEMAS
+// USERS AND PROFILES
 // ─────────────────────────────────────────────
 
+const optionalText = (max: number) => z.string().trim().max(max).optional();
+
 export const UpdateProfileSchema = z.object({
-  firstName: z.string().min(2).max(50).trim().optional(),
-  lastName: z.string().min(2).max(50).trim().optional(),
+  firstName: z.string().trim().min(2).max(50).optional(),
+  lastName: z.string().trim().min(2).max(50).optional(),
   phone: NigerianPhone,
   tenantProfile: z
     .object({
-      occupation: z.string().max(100).optional(),
-      employerName: z.string().max(100).optional(),
+      occupation: optionalText(100),
+      employerName: optionalText(100),
       monthlyIncome: z.number().positive().optional(),
-      numberOfOccupants: z.number().int().positive().optional(),
+      numberOfOccupants: z.number().int().positive().max(20).optional(),
       hasPets: z.boolean().optional(),
-      petDescription: z.string().max(200).optional(),
+      petDescription: optionalText(200),
       smokingHousehold: z.boolean().optional(),
-      previousAddress: z.string().max(200).optional(),
-      reasonForMoving: z.string().max(500).optional(),
-      nextOfKinName: z.string().max(100).optional(),
+      previousAddress: optionalText(200),
+      reasonForMoving: optionalText(500),
+      nextOfKinName: optionalText(100),
       nextOfKinPhone: NigerianPhone,
-      nextOfKinRelation: z.string().max(50).optional(),
+      nextOfKinRelation: optionalText(50),
     })
     .optional(),
   landlordProfile: z
     .object({
-      businessName: z.string().max(100).optional(),
-      bio: z.string().max(500).optional(),
-      bankAccountName: z.string().max(100).optional(),
-      bankAccountNumber: z
-        .string()
-        .regex(/^\d{10}$/, 'Bank account number must be exactly 10 digits')
-        .optional(),
-      bankCode: z.string().max(10).optional(),
+      businessName: optionalText(100),
+      bio: optionalText(500),
     })
     .optional(),
 });
-
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
 
+export const BankAccountSchema = z.object({
+  bankCode: z.string().trim().min(3, 'Choose your bank').max(10),
+  accountNumber: z.string().regex(/^\d{10}$/, 'Account numbers have 10 digits'),
+});
+
 export const UploadVerificationDocumentSchema = z.object({
-  documentType: z.enum([
-    'NIN',
-    'BVN',
-    'PASSPORT',
-    'DRIVERS_LICENSE',
-    'CAC_CERT',
-    'UTILITY_BILL',
-  ]),
-  documentNumber: z.string().min(5).max(50).optional(),
+  documentType: z.enum(['NIN', 'PASSPORT', 'DRIVERS_LICENSE', 'CAC_CERT', 'UTILITY_BILL']),
+  documentNumber: z.string().trim().min(5).max(50).optional(),
 });
-
-export type UploadVerificationDocumentInput = z.infer<
-  typeof UploadVerificationDocumentSchema
->;
+export type UploadVerificationDocumentInput = z.infer<typeof UploadVerificationDocumentSchema>;
 
 // ─────────────────────────────────────────────
-// NOTIFICATION SCHEMAS
+// ADMIN
 // ─────────────────────────────────────────────
 
-export const MarkNotificationReadSchema = z.object({
-  id: CuidId,
+export const AdminListQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  status: z.string().max(40).optional(),
+  page: queryInt(1).transform((v) => Math.max(1, v)),
+  limit: queryInt(25, 100).transform((v) => Math.max(1, v)),
 });
 
-export const RefundPaymentSchema = z.object({
-  amount: z.number().positive().optional(),
-  reason: z.string().min(10).max(500),
-});
-
-export const CreateDisputeSchema = z.object({
-  reason: z.string().min(20).max(1000),
-});
-
-export const ResolveDisputeSchema = z.object({
-  status: z.enum(['RESOLVED', 'REJECTED']),
-  resolution: z.string().min(10).max(1000),
-});
-
-export const ReviewVerificationSchema = z.object({
-  status: z.enum(['VERIFIED', 'REJECTED']),
-  rejectionReason: z.string().min(10).max(500).optional(),
-}).refine(
-  (value) => value.status !== 'REJECTED' || Boolean(value.rejectionReason),
-  { message: 'A rejection reason is required', path: ['rejectionReason'] },
-);
+export const ReviewVerificationSchema = z
+  .object({
+    status: z.enum(['VERIFIED', 'REJECTED']),
+    rejectionReason: z.string().trim().min(10).max(500).optional(),
+  })
+  .refine((value) => value.status !== 'REJECTED' || Boolean(value.rejectionReason), {
+    message: 'A rejection reason is required',
+    path: ['rejectionReason'],
+  });
 
 export const ModerateListingSchema = z.object({
   status: z.enum(['ACTIVE', 'SUSPENDED', 'ARCHIVED']),
-  reason: z.string().min(10).max(500),
+  reason: z.string().trim().min(10).max(500),
 });
 
 export const ModerateUserSchema = z.object({
   isActive: z.boolean(),
-  reason: z.string().min(10).max(500),
+  reason: z.string().trim().min(10).max(500),
 });

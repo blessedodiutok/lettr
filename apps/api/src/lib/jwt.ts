@@ -1,7 +1,5 @@
-// File: apps/api/src/lib/jwt.ts
-// JWT (JSON Web Token) helpers — sign and verify access and refresh tokens
-// Access tokens: short-lived (15 min), sent in Authorization header
-// Refresh tokens: long-lived (7 days), stored in httpOnly cookie
+// JWT helpers. Access tokens are short-lived and sent as a Bearer header.
+// Refresh tokens identify one device session (`sid`) and are rotated on every use.
 
 import type { UserRole } from "@prisma/client";
 import crypto from "node:crypto";
@@ -9,8 +7,11 @@ import type { SignOptions } from "jsonwebtoken";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 
+const ISSUER = "lettr-api";
+const AUDIENCE = "lettr-client";
+
 export interface AccessTokenPayload {
-  sub: string; // User ID
+  sub: string;
   email: string;
   role: UserRole;
   firstName: string;
@@ -19,46 +20,49 @@ export interface AccessTokenPayload {
 
 export interface RefreshTokenPayload {
   sub: string; // User ID
-  tokenVersion: number; // Incremented on password change to invalidate old tokens
+  sid: string; // Session ID — one per signed-in device
+  jti: string; // Unique per issued token, used to detect reuse
 }
 
-/** Sign a short-lived access token (15 minutes by default) */
 export function signAccessToken(payload: AccessTokenPayload): string {
   const options: SignOptions = {
     expiresIn: env.JWT_ACCESS_EXPIRES_IN as SignOptions["expiresIn"],
-    issuer: "lettr-api",
-    audience: "lettr-client",
+    issuer: ISSUER,
+    audience: AUDIENCE,
   };
   return jwt.sign(payload, env.JWT_ACCESS_SECRET, options);
 }
 
-/** Sign a long-lived refresh token (7 days by default) */
 export function signRefreshToken(payload: RefreshTokenPayload): string {
   const options: SignOptions = {
     expiresIn: env.JWT_REFRESH_EXPIRES_IN as SignOptions["expiresIn"],
-    issuer: "lettr-api",
-    audience: "lettr-client",
+    issuer: ISSUER,
+    audience: AUDIENCE,
   };
   return jwt.sign(payload, env.JWT_REFRESH_SECRET, options);
 }
 
-/** Verify and decode an access token — throws if expired or tampered */
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  return jwt.verify(token, env.JWT_ACCESS_SECRET, {
-    issuer: "lettr-api",
-    audience: "lettr-client",
-  }) as AccessTokenPayload;
+  return jwt.verify(token, env.JWT_ACCESS_SECRET, { issuer: ISSUER, audience: AUDIENCE }) as AccessTokenPayload;
 }
 
-/** Verify and decode a refresh token — throws if expired or tampered */
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
-  return jwt.verify(token, env.JWT_REFRESH_SECRET, {
-    issuer: "lettr-api",
-    audience: "lettr-client",
-  }) as RefreshTokenPayload;
+  return jwt.verify(token, env.JWT_REFRESH_SECRET, { issuer: ISSUER, audience: AUDIENCE }) as RefreshTokenPayload;
 }
 
-/** Generate a cryptographically random 6-digit OTP */
+/** Lifetime of a refresh token in seconds, derived from JWT_REFRESH_EXPIRES_IN. */
+export function refreshTtlSeconds(): number {
+  const match = /^(\d+)([smhd])$/.exec(env.JWT_REFRESH_EXPIRES_IN);
+  if (!match) return 30 * 24 * 60 * 60;
+  const unit = { s: 1, m: 60, h: 3600, d: 86400 }[match[2] as "s" | "m" | "h" | "d"];
+  return Number(match[1]) * unit;
+}
+
+/** Cryptographically random 6-digit OTP */
 export function generateOtp(): string {
   return crypto.randomInt(100000, 1_000_000).toString();
+}
+
+export function randomId(bytes = 16): string {
+  return crypto.randomBytes(bytes).toString("hex");
 }

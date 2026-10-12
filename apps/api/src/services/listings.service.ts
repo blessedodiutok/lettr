@@ -1,202 +1,192 @@
-// File: apps/api/src/services/listings.service.ts
-// Business logic for listing search, creation, and management
+// Listing search, detail, creation, publishing and saved homes.
 
-import {
-  calculateAgentCommission,
-  calculatePlatformFee,
-  calculateSavings,
-} from "@lettr/utils";
+import { calculateMoveInCost } from "@lettr/utils";
+import type { ListingStatus, UserRole } from "@prisma/client";
+import { prisma } from "../lib/prisma.js";
+import { deleteStoredFile } from "../lib/storage.js";
 import { createError } from "../middleware/errorHandler.js";
 import * as listingsRepo from "../repositories/listings.repository.js";
+import type { SearchFilters } from "../repositories/listings.repository.js";
+import { notify } from "./notify.js";
 
-interface SearchQuery {
-  state?: string;
-  lga?: string;
-  neighbourhood?: string;
-  propertyType?: string;
-  minRent?: string;
-  maxRent?: string;
-  bedrooms?: string;
-  isFurnished?: string;
-  isServiced?: string;
-  page?: string;
-  limit?: string;
+type Money = { toNumber(): number };
+type ListingRecord = NonNullable<Awaited<ReturnType<typeof listingsRepo.findListingById>>>;
+
+interface SearchQuery extends SearchFilters {
+  page: number;
+  limit: number;
   sortBy?: string;
 }
 
-export async function searchListings(query: SearchQuery, userId?: string) {
-  const page = Math.max(1, Number(query.page ?? 1));
-  const limit = Math.min(50, Math.max(1, Number(query.limit ?? 20)));
-  const skip = (page - 1) * limit;
-
-  const filters = {
-    state: query.state,
-    lga: query.lga,
-    neighbourhood: query.neighbourhood,
-    propertyType: query.propertyType as string | undefined,
-    minRent: query.minRent ? Number(query.minRent) : undefined,
-    maxRent: query.maxRent ? Number(query.maxRent) : undefined,
-    bedrooms: query.bedrooms ? Number(query.bedrooms) : undefined,
-    isFurnished: query.isFurnished === "true" ? true : undefined,
-    isServiced: query.isServiced === "true" ? true : undefined,
-  };
-
-  const { listings, total } = await listingsRepo.searchListings(
-    filters,
-    skip,
-    limit,
-    query.sortBy,
-  );
-
-  // Attach savings callout to each listing
-  const enrichedListings = listings.map((l) => ({
-    ...l,
-    agentFeeSaved: calculateAgentCommission(l.annualRent.toNumber()),
-    platformFee: calculatePlatformFee(l.annualRent.toNumber()),
-    savings: calculateSavings(l.annualRent.toNumber()),
-  }));
-
-  // If tenant, mark which listings they've saved
-  let savedIds: Set<string> = new Set();
-  if (userId) {
-    const saved = await listingsRepo.getSavedListingIds(userId);
-    savedIds = new Set(saved);
-  }
-
-  return {
-    listings: enrichedListings.map((l) => ({
-      ...l,
-      isSaved: savedIds.has(l.id),
-    })),
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
-  };
-}
-
-export async function getMapListings(query: SearchQuery) {
-  // Returns minimal data for map pins — just id, lat, lng, rent, type
-  const filters = {
-    state: query.state,
-    lga: query.lga,
-    propertyType: query.propertyType,
-    minRent: query.minRent ? Number(query.minRent) : undefined,
-    maxRent: query.maxRent ? Number(query.maxRent) : undefined,
-  };
-  return listingsRepo.getMapListings(filters);
-}
-
-export async function getListing(id: string, userId?: string) {
-  const listing = await listingsRepo.findListingById(id);
-  if (!listing) {
-    throw createError("Listing not found", 404);
-  }
-  if (listing.status !== "ACTIVE" && listing.landlordId !== userId) {
-    throw createError("Listing not found", 404);
-  }
-
-  // Increment view counter (fire and forget — not awaited to keep response fast)
-  listingsRepo.incrementViewCount(id).catch(() => {});
-
-  const isSaved = userId
-    ? await listingsRepo.isListingSaved(id, userId)
-    : false;
-
-  return {
-    ...listing,
-    isSaved,
-    agentFeeSaved: calculateAgentCommission(listing.annualRent.toNumber()),
-    platformFee: calculatePlatformFee(listing.annualRent.toNumber()),
-    savings: calculateSavings(listing.annualRent.toNumber()),
-  };
-}
-
-export async function createListing(
-  body: Record<string, unknown>,
-  landlordId: string,
-) {
-  const { property, listing } = body as {
-    property: Record<string, unknown>;
-    listing: Record<string, unknown>;
-  };
-
-  return listingsRepo.createPropertyWithListing({
-    property: { ...property, landlordId } as unknown as Parameters<
-      typeof listingsRepo.createPropertyWithListing
-    >[0]["property"],
-    listing: { ...listing, landlordId } as unknown as Parameters<
-      typeof listingsRepo.createPropertyWithListing
-    >[0]["listing"],
+function costOf(listing: { annualRent: Money; cautionFee: Money; serviceCharge: Money; legalFee: Money }) {
+  return calculateMoveInCost({
+    annualRent: listing.annualRent.toNumber(),
+    cautionFee: listing.cautionFee.toNumber(),
+    serviceCharge: listing.serviceCharge.toNumber(),
+    legalFee: listing.legalFee.toNumber(),
   });
 }
 
-export async function updateListing(
-  id: string,
-  body: Record<string, unknown>,
-  landlordId: string,
-) {
-  const listing = await listingsRepo.findListingById(id);
-  if (!listing) throw createError("Listing not found", 404);
-  if (listing.landlordId !== landlordId)
-    throw createError("Not authorised to edit this listing", 403);
-  const { property, listing: listingData } = body as {
-    property?: Record<string, unknown>;
-    listing?: Record<string, unknown>;
-  };
-  return listingsRepo.updatePropertyAndListing(id, listing.propertyId, property, listingData);
+function enrich<T extends ListingRecord>(listing: T, savedIds?: Set<string>) {
+  return { ...listing, moveInCost: costOf(listing), isSaved: savedIds?.has(listing.id) ?? false };
 }
 
-export async function deleteListing(id: string, landlordId: string) {
+export async function searchListings(query: SearchQuery, userId?: string) {
+  const skip = (query.page - 1) * query.limit;
+  const { listings, total } = await listingsRepo.searchListings(query, skip, query.limit, query.sortBy);
+  const savedIds = userId ? await listingsRepo.getSavedListingIds(userId, listings.map((l) => l.id)) : undefined;
+  return {
+    listings: listings.map((listing) => enrich(listing, savedIds)),
+    pagination: { page: query.page, limit: query.limit, total, totalPages: Math.max(1, Math.ceil(total / query.limit)) },
+  };
+}
+
+export async function getMapListings(query: SearchFilters) {
+  return listingsRepo.getMapListings(query);
+}
+
+/**
+ * Active listings are public. Owners and admins see any status. A tenant with a
+ * conversation or tenancy for the home can still see it after it's taken.
+ */
+async function canView(listing: ListingRecord, userId?: string, role?: UserRole) {
+  if (listing.status === "ACTIVE") return true;
+  if (!userId) return false;
+  if (listing.landlordId === userId || role === "ADMIN") return true;
+  const link = await prisma.inquiry.findUnique({ where: { listingId_tenantId: { listingId: listing.id, tenantId: userId } }, select: { id: true } });
+  return Boolean(link);
+}
+
+export async function getListing(id: string, userId?: string, role?: UserRole) {
   const listing = await listingsRepo.findListingById(id);
-  if (!listing) throw createError("Listing not found", 404);
-  if (listing.landlordId !== landlordId)
-    throw createError("Not authorised to delete this listing", 403);
-  if (listing.status === "TAKEN" || listing.status === "UNDER_OFFER") {
-    throw createError(
-      "Cannot delete a listing with an active tenancy or pending payment",
-      400,
-    );
+  if (!listing || !(await canView(listing, userId, role))) throw createError("This home isn't available.", 404);
+  if (listing.landlordId !== userId && listing.status === "ACTIVE") {
+    listingsRepo.incrementViewCount(id).catch(() => undefined);
   }
-  return listingsRepo.deleteListing(id);
+  const savedIds = userId ? await listingsRepo.getSavedListingIds(userId, [id]) : undefined;
+  return enrich(listing, savedIds);
+}
+
+async function ownedListing(id: string, landlordId: string) {
+  const listing = await listingsRepo.findListingById(id);
+  if (!listing) throw createError("Listing not found.", 404);
+  if (listing.landlordId !== landlordId) throw createError("You can only manage your own listings.", 403);
+  return listing;
+}
+
+export async function createListing(body: { property: Record<string, unknown>; listing: Record<string, unknown> }, landlordId: string) {
+  const listing = await listingsRepo.createPropertyWithListing({ landlordId, ...body });
+  return enrich(listing);
+}
+
+// Terms that are locked once a tenant is committing money to them.
+const LOCKED_TERMS = ["annualRent", "cautionFee", "serviceCharge", "legalFee", "availableFrom", "minimumLeaseTerm"];
+
+export async function updateListing(
+  id: string,
+  body: { property?: Record<string, unknown>; listing?: Record<string, unknown> },
+  landlordId: string,
+) {
+  const listing = await ownedListing(id, landlordId);
+  const committed: ListingStatus[] = ["UNDER_OFFER", "TAKEN"];
+  if (committed.includes(listing.status) && body.listing && Object.keys(body.listing).some((key) => LOCKED_TERMS.includes(key))) {
+    throw createError("Rent, fees and dates can't change while a tenant is committed to this home.", 409);
+  }
+  const updated = await listingsRepo.updatePropertyAndListing(id, listing.propertyId, body.property, body.listing);
+  return enrich(updated);
 }
 
 export async function publishListing(id: string, landlordId: string) {
-  const listing = await listingsRepo.findListingById(id);
-  if (!listing) throw createError("Listing not found", 404);
-  if (listing.landlordId !== landlordId)
-    throw createError("Not authorised", 403);
-  if (listing.property.photos.length === 0) {
-    throw createError("At least one photo is required before publishing", 400);
+  const listing = await ownedListing(id, landlordId);
+  if (listing.status === "ACTIVE") return enrich(listing);
+  if (listing.status === "SUSPENDED") throw createError("This listing was suspended by Lettr. Contact support to reinstate it.", 409);
+  if (listing.status === "UNDER_OFFER" || listing.status === "TAKEN") throw createError("This home is already let or held for a tenant.", 409);
+  if (listing.property.photos.length === 0) throw createError("Add at least one photo before publishing.", 409, { code: "PHOTOS_REQUIRED" });
+
+  const verification = listing.landlord.landlordProfile?.verificationStatus;
+  if (verification !== "VERIFIED" && verification !== "PENDING_REVIEW") {
+    throw createError("Submit an ID document for verification before publishing.", 409, { code: "VERIFICATION_REQUIRED" });
   }
-  return listingsRepo.updateListingStatus(id, "ACTIVE", new Date());
+  const published = await listingsRepo.updateListingStatus(id, "ACTIVE", { publishedAt: listing.publishedAt ?? new Date() });
+  return enrich(published);
 }
 
 export async function archiveListing(id: string, landlordId: string) {
-  const listing = await listingsRepo.findListingById(id);
-  if (!listing) throw createError("Listing not found", 404);
-  if (listing.landlordId !== landlordId)
-    throw createError("Not authorised", 403);
-  return listingsRepo.updateListingStatus(id, "ARCHIVED");
+  const listing = await ownedListing(id, landlordId);
+  if (listing.status === "UNDER_OFFER" || listing.status === "TAKEN") {
+    throw createError("You can't archive a home that a tenant has accepted or paid for.", 409);
+  }
+  if (listing.status === "SUSPENDED") throw createError("Suspended listings are managed by Lettr.", 409);
+
+  const open = await prisma.inquiry.findMany({
+    where: { listingId: id, status: { notIn: ["DECLINED", "EXPIRED", "ACCEPTED"] } },
+    select: { id: true, tenantId: true },
+  });
+  const archived = await prisma.$transaction(async (tx) => {
+    await tx.inquiry.updateMany({
+      where: { id: { in: open.map((i) => i.id) } },
+      data: { status: "DECLINED", closedAt: new Date(), closedReason: "Listing taken off the market" },
+    });
+    return tx.listing.update({ where: { id }, data: { status: "ARCHIVED" }, include: listingsRepo.LISTING_INCLUDE });
+  });
+  await Promise.all(
+    open.map((inquiry) =>
+      notify({
+        userId: inquiry.tenantId,
+        type: "SYSTEM",
+        title: `${listing.property.title} is no longer available`,
+        body: "The landlord has taken this home off the market.",
+        link: `/messages/${inquiry.id}`,
+      }),
+    ),
+  );
+  return enrich(archived);
+}
+
+/** Drafts that never reached a tenant are deleted outright; anything else is archived. */
+export async function deleteListing(id: string, landlordId: string) {
+  const listing = await ownedListing(id, landlordId);
+  const hasHistory = await prisma.inquiry.count({ where: { listingId: id } });
+  if (listing.status !== "DRAFT" || hasHistory) return archiveListing(id, landlordId);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.savedListing.deleteMany({ where: { listingId: id } });
+    await tx.listing.delete({ where: { id } });
+    const otherListings = await tx.listing.count({ where: { propertyId: listing.propertyId } });
+    if (!otherListings) await tx.property.delete({ where: { id: listing.propertyId } });
+  });
+  await Promise.all(listing.property.photos.map((photo) => deleteStoredFile(photo.publicId)));
+  return { deleted: true };
 }
 
 export async function saveListing(listingId: string, userId: string) {
-  const listing = await listingsRepo.findListingById(listingId);
-  if (!listing) throw createError("Listing not found", 404);
-  if (listing.status !== "ACTIVE") throw createError("Only active listings can be saved", 400);
-  return listingsRepo.saveListing(userId, listingId);
+  const listing = await prisma.listing.findUnique({ where: { id: listingId }, select: { status: true } });
+  if (!listing) throw createError("Listing not found.", 404);
+  if (listing.status !== "ACTIVE") throw createError("Only available homes can be saved.", 409);
+  await listingsRepo.saveListing(userId, listingId);
+  return { saved: true };
 }
 
 export async function unsaveListing(listingId: string, userId: string) {
-  return listingsRepo.unsaveListing(userId, listingId);
+  await listingsRepo.unsaveListing(userId, listingId);
+  return { saved: false };
 }
 
 export async function getSavedListings(userId: string) {
-  return listingsRepo.getSavedListings(userId);
+  const saved = await listingsRepo.getSavedListings(userId);
+  return saved.map((entry) => ({ savedAt: entry.createdAt, listing: { ...enrich(entry.listing), isSaved: true } }));
 }
 
 export async function getMyListings(landlordId: string) {
-  return listingsRepo.getListingsByLandlord(landlordId);
+  const listings = await listingsRepo.getListingsByLandlord(landlordId);
+  return listings.map(({ _count, ...listing }) => ({
+    ...enrich(listing),
+    openInquiries: _count.inquiries,
+    savedCount: _count.savedBy,
+  }));
+}
+
+/** A landlord's own listing in any status, for the editor. */
+export async function getMyListing(id: string, landlordId: string) {
+  return enrich(await ownedListing(id, landlordId));
 }

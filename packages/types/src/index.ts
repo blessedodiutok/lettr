@@ -347,6 +347,13 @@ export interface Inquiry extends BaseEntity {
   landlordId: string;
   status: InquiryStatus;
   initialMessage: string;
+  offerMadeAt: string | null;
+  offerExpiresAt: string | null;
+  offerNote: string | null;
+  acceptedAt: string | null;
+  paymentDueAt: string | null;
+  closedAt: string | null;
+  closedReason: string | null;
   messages: InquiryMessage[];
   listing?: Pick<Listing, 'id' | 'annualRent' | 'status'> & {
     property: Pick<Property, 'title' | 'neighbourhood' | 'state' | 'photos'>;
@@ -372,6 +379,12 @@ export interface TenancyAgreement extends BaseEntity {
   tenancyEndDate: string | null;
   handoverConfirmedAt: string | null;
   isHandoverConfirmed: boolean;
+  handoverMarkedAt: string | null;
+  moveInConfirmedAt: string | null;
+  autoReleaseAt: string | null;
+  releaseMethod: 'TENANT_CONFIRMED' | 'AUTO' | 'ADMIN' | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
   listing?: Pick<Listing, 'id' | 'annualRent'> & {
     property: Pick<Property, 'title' | 'address' | 'photos'>;
   };
@@ -394,9 +407,12 @@ export interface Payment extends BaseEntity {
   listingId: string;
   tenantId: string;
   tenancyAgreementId: string | null;
+  inquiryId: string | null;
   status: PaymentStatus;
   annualRent: number;
   cautionFee: number;
+  serviceCharge: number;
+  legalFee: number;
   platformFee: number;
   agentFeeSaved: number;
   totalAmount: number;
@@ -408,6 +424,8 @@ export interface Payment extends BaseEntity {
   transferReference: string | null;
   refundedAt: string | null;
   refundReason: string | null;
+  refundAmount: number | null;
+  releaseError: string | null;
   receipt?: Receipt | null;
   listing?: Pick<Listing, 'id'> & {
     property: Pick<Property, 'title' | 'address' | 'photos'>;
@@ -546,6 +564,93 @@ export interface PaymentDispute extends BaseEntity {
   reason: string;
   status: DisputeStatus;
   resolution: string | null;
+  outcome: 'REFUND_TENANT' | 'RELEASE_TO_LANDLORD' | 'NO_ACTION' | null;
   resolvedById: string | null;
   resolvedAt: string | null;
 }
+
+// ─────────────────────────────────────────────
+// DOMAIN CONSTANTS
+// Single source for labels and option lists used by the API, web and mobile.
+// ─────────────────────────────────────────────
+
+/** All 36 states plus the Federal Capital Territory, as stored on properties. */
+export const NIGERIAN_STATES = [
+  'Abia', 'Abuja (FCT)', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue',
+  'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'Gombe', 'Imo',
+  'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa',
+  'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe',
+  'Zamfara',
+] as const;
+export type NigerianState = (typeof NIGERIAN_STATES)[number];
+
+/** States where Lettr is launching — shown first in pickers. */
+export const LAUNCH_STATES: readonly NigerianState[] = ['Lagos', 'Abuja (FCT)', 'Rivers'];
+
+export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
+  SELF_CONTAINED: 'Self-contained',
+  MINI_FLAT: 'Mini flat',
+  ONE_BEDROOM: '1-bedroom flat',
+  TWO_BEDROOM: '2-bedroom flat',
+  THREE_BEDROOM: '3-bedroom flat',
+  FOUR_BEDROOM: '4-bedroom flat',
+  DUPLEX: 'Duplex',
+  BUNGALOW: 'Bungalow',
+  BOYS_QUARTERS: "Boys' quarters",
+  MANSION: 'Mansion',
+  PENTHOUSE: 'Penthouse',
+  STUDIO: 'Studio',
+  TERRACE: 'Terrace',
+  SEMI_DETACHED: 'Semi-detached house',
+  DETACHED: 'Detached house',
+};
+
+export const AMENITY_GROUPS: ReadonlyArray<{ label: string; items: ReadonlyArray<{ type: AmenityType; label: string }> }> = [
+  { label: 'Power and water', items: [
+    { type: AmenityType.PREPAID_ELECTRICITY, label: 'Prepaid meter' },
+    { type: AmenityType.POSTPAID_ELECTRICITY, label: 'Postpaid meter' },
+    { type: AmenityType.CONSTANT_ELECTRICITY, label: '24-hour power' },
+    { type: AmenityType.GENERATOR_COMMON, label: 'Estate generator' },
+    { type: AmenityType.GENERATOR_PRIVATE, label: 'Private generator' },
+    { type: AmenityType.WATER_SUPPLY, label: 'Running water' },
+    { type: AmenityType.BOREHOLE, label: 'Borehole' },
+  ] },
+  { label: 'Security', items: [
+    { type: AmenityType.SECURITY_GUARD, label: 'Security guard' },
+    { type: AmenityType.CCTV, label: 'CCTV' },
+    { type: AmenityType.GATED_ESTATE, label: 'Gated estate' },
+    { type: AmenityType.INTERCOM, label: 'Intercom' },
+  ] },
+  { label: 'Facilities', items: [
+    { type: AmenityType.PARKING_SPACE, label: 'Parking' },
+    { type: AmenityType.SWIMMING_POOL, label: 'Swimming pool' },
+    { type: AmenityType.GYM, label: 'Gym' },
+    { type: AmenityType.PLAYGROUND, label: 'Playground' },
+    { type: AmenityType.INTERNET_FIBRE, label: 'Fibre internet' },
+    { type: AmenityType.INTERNET_CABLE, label: 'Cable internet' },
+  ] },
+  { label: 'Inside', items: [
+    { type: AmenityType.AIR_CONDITIONING, label: 'Air conditioning' },
+    { type: AmenityType.CEILING_FAN, label: 'Ceiling fans' },
+    { type: AmenityType.GAS_COOKER, label: 'Gas cooker point' },
+    { type: AmenityType.WASHING_MACHINE_POINT, label: 'Washing machine point' },
+  ] },
+  { label: 'Outside', items: [
+    { type: AmenityType.BALCONY, label: 'Balcony' },
+    { type: AmenityType.GARDEN, label: 'Garden' },
+    { type: AmenityType.ROOFTOP_TERRACE, label: 'Rooftop terrace' },
+    { type: AmenityType.SERVANTS_QUARTERS, label: "Servants' quarters" },
+  ] },
+];
+
+export const AMENITY_LABELS = Object.fromEntries(
+  AMENITY_GROUPS.flatMap((group) => group.items.map((item) => [item.type, item.label])),
+) as Record<AmenityType, string>;
+
+export const VERIFICATION_DOCUMENT_TYPES = [
+  { value: 'NIN', label: 'National Identification Number (NIN) slip' },
+  { value: 'PASSPORT', label: 'International passport' },
+  { value: 'DRIVERS_LICENSE', label: "Driver's licence" },
+  { value: 'CAC_CERT', label: 'CAC certificate (companies)' },
+  { value: 'UTILITY_BILL', label: 'Utility bill for the property' },
+] as const;

@@ -1,10 +1,9 @@
-// File: apps/api/src/repositories/listings.repository.ts
-// All Prisma queries for the listings domain
+// Prisma queries for listings and properties.
 
 import type { ListingStatus, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
-const LISTING_INCLUDE = {
+export const LISTING_INCLUDE = {
   property: {
     include: {
       photos: { orderBy: { displayOrder: "asc" as const } },
@@ -17,19 +16,22 @@ const LISTING_INCLUDE = {
       firstName: true,
       lastName: true,
       avatarUrl: true,
+      createdAt: true,
       landlordProfile: {
         select: {
           verificationStatus: true,
           averageRating: true,
           totalReviews: true,
           totalRentalsCompleted: true,
+          businessName: true,
         },
       },
     },
   },
 } satisfies Prisma.ListingInclude;
 
-interface SearchFilters {
+export interface SearchFilters {
+  q?: string;
   state?: string;
   lga?: string;
   neighbourhood?: string;
@@ -41,153 +43,108 @@ interface SearchFilters {
   isServiced?: boolean;
 }
 
-export async function searchListings(
-  filters: SearchFilters,
-  skip: number,
-  take: number,
-  sortBy?: string,
-) {
-  const where: Prisma.ListingWhereInput = {
+export function buildSearchWhere(filters: SearchFilters): Prisma.ListingWhereInput {
+  const insensitive = (value: string) => ({ equals: value, mode: "insensitive" as const });
+  const contains = (value: string) => ({ contains: value, mode: "insensitive" as const });
+  const terms = filters.q?.split(/[\s,]+/).filter((term) => term.length > 1).slice(0, 5) ?? [];
+
+  return {
     status: "ACTIVE",
     property: {
-      ...(filters.state && {
-        state: { equals: filters.state, mode: "insensitive" },
-      }),
-      ...(filters.lga && { lga: { equals: filters.lga, mode: "insensitive" } }),
-      ...(filters.neighbourhood && {
-        neighbourhood: { contains: filters.neighbourhood, mode: "insensitive" },
-      }),
-      ...(filters.propertyType && {
-        propertyType: filters.propertyType as never,
-      }),
-      ...(filters.bedrooms !== undefined && { bedrooms: filters.bedrooms }),
-      ...(filters.isFurnished !== undefined && {
-        isFurnished: filters.isFurnished,
-      }),
-      ...(filters.isServiced !== undefined && {
-        isServiced: filters.isServiced,
+      ...(filters.state && { state: insensitive(filters.state) }),
+      ...(filters.lga && { lga: insensitive(filters.lga) }),
+      ...(filters.neighbourhood && { neighbourhood: contains(filters.neighbourhood) }),
+      ...(filters.propertyType && { propertyType: filters.propertyType as Prisma.EnumPropertyTypeFilter["equals"] }),
+      ...(filters.bedrooms !== undefined && { bedrooms: { gte: filters.bedrooms } }),
+      ...(filters.isFurnished && { isFurnished: true }),
+      ...(filters.isServiced && { isServiced: true }),
+      // Every search word must match somewhere: "lekki 3 bedroom" narrows rather than widens.
+      ...(terms.length && {
+        AND: terms.map((term) => ({
+          OR: [{ title: contains(term) }, { neighbourhood: contains(term) }, { lga: contains(term) }, { state: contains(term) }, { address: contains(term) }],
+        })),
       }),
     },
-    ...(filters.minRent !== undefined || filters.maxRent !== undefined
-      ? {
-          annualRent: {
-            ...(filters.minRent !== undefined && { gte: filters.minRent }),
-            ...(filters.maxRent !== undefined && { lte: filters.maxRent }),
-          },
-        }
-      : {}),
-  };
-
-  const orderBy: Prisma.ListingOrderByWithRelationInput =
-    sortBy === "price_asc"
-      ? { annualRent: "asc" }
-      : sortBy === "price_desc"
-        ? { annualRent: "desc" }
-        : sortBy === "newest"
-          ? { publishedAt: "desc" }
-          : { viewCount: "desc" }; // default: most popular
-
-  const [listings, total] = await prisma.$transaction([
-    prisma.listing.findMany({
-      where,
-      include: LISTING_INCLUDE,
-      orderBy,
-      skip,
-      take,
+    ...((filters.minRent !== undefined || filters.maxRent !== undefined) && {
+      annualRent: {
+        ...(filters.minRent !== undefined && { gte: filters.minRent }),
+        ...(filters.maxRent !== undefined && { lte: filters.maxRent }),
+      },
     }),
+  };
+}
+
+const ORDER: Record<string, Prisma.ListingOrderByWithRelationInput[]> = {
+  price_asc: [{ annualRent: "asc" }],
+  price_desc: [{ annualRent: "desc" }],
+  newest: [{ publishedAt: "desc" }],
+  popular: [{ viewCount: "desc" }, { publishedAt: "desc" }],
+};
+
+export async function searchListings(filters: SearchFilters, skip: number, take: number, sortBy = "newest") {
+  const where = buildSearchWhere(filters);
+  const [listings, total] = await prisma.$transaction([
+    prisma.listing.findMany({ where, include: LISTING_INCLUDE, orderBy: ORDER[sortBy] ?? ORDER.newest, skip, take }),
     prisma.listing.count({ where }),
   ]);
-
   return { listings, total };
 }
 
-export async function getMapListings(filters: Partial<SearchFilters>) {
+export function getMapListings(filters: SearchFilters) {
+  const where = buildSearchWhere(filters);
   return prisma.listing.findMany({
-    where: {
-      status: "ACTIVE",
-      property: {
-        ...(filters.state && {
-          state: { equals: filters.state, mode: "insensitive" },
-        }),
-        ...(filters.lga && {
-          lga: { equals: filters.lga, mode: "insensitive" },
-        }),
-        latitude: { not: null },
-        longitude: { not: null },
-      },
-    },
+    where: { ...where, property: { ...(where.property as Prisma.PropertyWhereInput), latitude: { not: null }, longitude: { not: null } } },
     select: {
       id: true,
       annualRent: true,
       property: {
         select: {
+          title: true,
           latitude: true,
           longitude: true,
           propertyType: true,
+          bedrooms: true,
           neighbourhood: true,
           photos: { where: { isCover: true }, select: { url: true }, take: 1 },
         },
       },
     },
-    take: 500, // Cap map pins to prevent browser overload
+    take: 500,
   });
 }
 
-export async function findListingById(id: string) {
-  return prisma.listing.findUnique({
-    where: { id },
-    include: {
-      ...LISTING_INCLUDE,
-      reviews: {
-        include: {
-          reviewer: {
-            select: { firstName: true, lastName: true, avatarUrl: true },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-      },
-    },
-  });
+export function findListingById(id: string) {
+  return prisma.listing.findUnique({ where: { id }, include: LISTING_INCLUDE });
 }
 
-export async function createPropertyWithListing(input: {
-  property: Record<string, unknown> & { landlordId: string };
-  listing: Record<string, unknown> & { landlordId: string };
+export function createPropertyWithListing(input: {
+  landlordId: string;
+  property: Record<string, unknown>;
+  listing: Record<string, unknown>;
 }) {
   return prisma.$transaction(async (tx) => {
-    const { amenities, ...propertyData } = input.property;
+    const { amenities, ...propertyData } = input.property as { amenities?: Array<{ type: string; notes?: string }> };
     const property = await tx.property.create({
       data: {
-        ...(propertyData as Prisma.PropertyUncheckedCreateInput),
-        ...(Array.isArray(amenities) && amenities.length
-          ? { amenities: { create: amenities as Prisma.AmenityCreateWithoutPropertyInput[] } }
-          : {}),
+        ...(propertyData as Omit<Prisma.PropertyUncheckedCreateInput, "landlordId">),
+        landlordId: input.landlordId,
+        ...(amenities?.length && { amenities: { create: amenities as Prisma.AmenityCreateWithoutPropertyInput[] } }),
       },
     });
-    const { landlordId, ...listingData } = input.listing;
-    const listing = await tx.listing.create({
+    return tx.listing.create({
       data: {
+        ...(input.listing as Omit<Prisma.ListingUncheckedCreateInput, "propertyId" | "landlordId" | "availableFrom">),
+        availableFrom: new Date(String(input.listing.availableFrom)),
         propertyId: property.id,
-        landlordId,
-        ...(listingData as Omit<Prisma.ListingUncheckedCreateInput, "propertyId" | "landlordId">),
-        availableFrom: new Date(String(listingData.availableFrom)),
+        landlordId: input.landlordId,
+        status: "DRAFT",
       },
       include: LISTING_INCLUDE,
     });
-    return listing;
   });
 }
 
-export async function updateListing(id: string, data: Record<string, unknown>) {
-  return prisma.listing.update({
-    where: { id },
-    data,
-    include: LISTING_INCLUDE,
-  });
-}
-
-export async function updatePropertyAndListing(
+export function updatePropertyAndListing(
   id: string,
   propertyId: string,
   propertyData?: Record<string, unknown>,
@@ -195,66 +152,49 @@ export async function updatePropertyAndListing(
 ) {
   return prisma.$transaction(async (tx) => {
     if (propertyData) {
-      const { amenities, ...fields } = propertyData;
-      await tx.property.update({
-        where: { id: propertyId },
-        data: fields as Prisma.PropertyUpdateInput,
-      });
+      const { amenities, ...fields } = propertyData as { amenities?: Array<{ type: string; notes?: string }> };
+      await tx.property.update({ where: { id: propertyId }, data: fields as Prisma.PropertyUpdateInput });
       if (Array.isArray(amenities)) {
         await tx.amenity.deleteMany({ where: { propertyId } });
-        await tx.amenity.createMany({
-          data: amenities.map((amenity) => {
-            const value = amenity as { type: Prisma.AmenityCreateManyInput["type"]; notes?: string };
-            return { propertyId, type: value.type, notes: value.notes };
-          }),
-        });
+        if (amenities.length) {
+          await tx.amenity.createMany({
+            data: amenities.map((amenity) => ({ propertyId, type: amenity.type as Prisma.AmenityCreateManyInput["type"], notes: amenity.notes })),
+          });
+        }
       }
     }
     return tx.listing.update({
       where: { id },
       data: {
         ...(listingData as Prisma.ListingUpdateInput),
-        ...(listingData?.availableFrom
-          ? { availableFrom: new Date(String(listingData.availableFrom)) }
-          : {}),
+        ...(listingData?.availableFrom ? { availableFrom: new Date(String(listingData.availableFrom)) } : {}),
       },
       include: LISTING_INCLUDE,
     });
   });
 }
 
-export async function updateListingStatus(
-  id: string,
-  status: ListingStatus,
-  publishedAt?: Date,
-) {
-  return prisma.listing.update({
-    where: { id },
-    data: { status, ...(publishedAt && { publishedAt }) },
-    include: LISTING_INCLUDE,
-  });
+export function updateListingStatus(id: string, status: ListingStatus, extra: Prisma.ListingUpdateInput = {}) {
+  return prisma.listing.update({ where: { id }, data: { status, ...extra }, include: LISTING_INCLUDE });
 }
 
-export async function deleteListing(id: string) {
-  return prisma.listing.update({ where: { id }, data: { status: "ARCHIVED" } });
-}
-
-export async function incrementViewCount(id: string) {
-  return prisma.listing.update({
-    where: { id },
-    data: { viewCount: { increment: 1 } },
-  });
+export function incrementViewCount(id: string) {
+  return prisma.listing.update({ where: { id }, data: { viewCount: { increment: 1 } }, select: { id: true } });
 }
 
 export async function getListingsByLandlord(landlordId: string) {
-  return prisma.listing.findMany({
+  const listings = await prisma.listing.findMany({
     where: { landlordId },
-    include: LISTING_INCLUDE,
-    orderBy: { createdAt: "desc" },
+    include: {
+      ...LISTING_INCLUDE,
+      _count: { select: { inquiries: { where: { status: { notIn: ["DECLINED", "EXPIRED"] } } }, savedBy: true } },
+    },
+    orderBy: { updatedAt: "desc" },
   });
+  return listings;
 }
 
-export async function saveListing(userId: string, listingId: string) {
+export function saveListing(userId: string, listingId: string) {
   return prisma.savedListing.upsert({
     where: { userId_listingId: { userId, listingId } },
     create: { userId, listingId },
@@ -262,11 +202,11 @@ export async function saveListing(userId: string, listingId: string) {
   });
 }
 
-export async function unsaveListing(userId: string, listingId: string) {
+export function unsaveListing(userId: string, listingId: string) {
   return prisma.savedListing.deleteMany({ where: { userId, listingId } });
 }
 
-export async function getSavedListings(userId: string) {
+export function getSavedListings(userId: string) {
   return prisma.savedListing.findMany({
     where: { userId },
     include: { listing: { include: LISTING_INCLUDE } },
@@ -274,20 +214,10 @@ export async function getSavedListings(userId: string) {
   });
 }
 
-export async function getSavedListingIds(userId: string): Promise<string[]> {
+export async function getSavedListingIds(userId: string, listingIds?: string[]): Promise<Set<string>> {
   const saved = await prisma.savedListing.findMany({
-    where: { userId },
+    where: { userId, ...(listingIds && { listingId: { in: listingIds } }) },
     select: { listingId: true },
   });
-  return saved.map((s) => s.listingId);
-}
-
-export async function isListingSaved(
-  listingId: string,
-  userId: string,
-): Promise<boolean> {
-  const saved = await prisma.savedListing.findUnique({
-    where: { userId_listingId: { userId, listingId } },
-  });
-  return !!saved;
+  return new Set(saved.map((s) => s.listingId));
 }

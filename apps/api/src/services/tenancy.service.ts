@@ -1,203 +1,191 @@
-// File: apps/api/src/services/tenancy.service.ts
-// Business logic for tenancy agreements
-// Uses tenancy.repository for all Prisma queries
+// Tenancy agreements: signing, handover, move-in confirmation and cancellation.
+// Agreements are created by the payment processor when rent reaches escrow.
 
+import { addDays, formatAppointment, RENTAL_RULES } from "@lettr/utils";
 import type { UserRole } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { createError } from "../middleware/errorHandler.js";
-import * as notificationsRepo from "../repositories/notifications.repository.js";
 import * as tenancyRepo from "../repositories/tenancy.repository.js";
+import { notify } from "./notify.js";
 import * as paymentsService from "./payments.service.js";
 
-function generateAgreementText(params: {
-  landlordName: string;
-  tenantName: string;
-  propertyAddress: string;
-  annualRent: number;
-  startDate: Date;
-  endDate: Date;
-}): string {
-  const rentFormatted = `₦${params.annualRent.toLocaleString("en-NG")}`;
-  const start = params.startDate.toLocaleDateString("en-NG", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-  const end = params.endDate.toLocaleDateString("en-NG", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+type Agreement = NonNullable<Awaited<ReturnType<typeof tenancyRepo.findTenancyById>>>;
 
-  return `
-RESIDENTIAL TENANCY AGREEMENT
-
-This agreement is entered into between:
-LANDLORD: ${params.landlordName}
-TENANT: ${params.tenantName}
-
-PROPERTY: ${params.propertyAddress}
-
-TERMS:
-1. TENANCY PERIOD: From ${start} to ${end} (12 months).
-2. ANNUAL RENT: ${rentFormatted} payable annually in advance.
-3. USE: The tenant shall use the property solely as a private residence.
-4. MAINTENANCE: The tenant shall keep the property in good repair.
-5. SUBLETTING: The tenant shall not sublet without written landlord consent.
-6. TERMINATION: Two months' written notice required by either party.
-7. PLATFORM: This tenancy was arranged through Lettr — no agent fees were charged.
-
-Signed electronically via the Lettr platform.
-  `.trim();
+function partyOf(agreement: { tenantId: string; landlordId: string }, userId: string, role: UserRole) {
+  if (agreement.tenantId === userId) return "TENANT" as const;
+  if (agreement.landlordId === userId) return "LANDLORD" as const;
+  if (role === "ADMIN") return "ADMIN" as const;
+  throw createError("You don't have access to this tenancy.", 403);
 }
 
-export async function createAgreement(
-  body: {
-    listingId: string;
-    tenantId: string;
-    tenancyStartDate: string;
-    paymentId?: string;
-  },
-  landlordId: string,
-) {
-  // Fetch listing with property + landlord details for the agreement text
-  const listing = await prisma.listing.findUnique({
-    where: { id: body.listingId },
-    include: { property: true, landlord: true },
-  });
-  if (!listing) throw createError("Listing not found", 404);
-  if (listing.landlordId !== landlordId)
-    throw createError("Not authorised", 403);
+function escrowPayment(agreement: Agreement) {
+  return agreement.payments.find((payment) => ["IN_ESCROW", "RELEASED", "PROCESSING"].includes(payment.status)) ?? agreement.payments[0] ?? null;
+}
 
-  const tenant = await prisma.user.findUnique({ where: { id: body.tenantId } });
-  if (!tenant) throw createError("Tenant not found", 404);
+/** What the viewer can do next — clients render actions from this. */
+function availableActions(agreement: Agreement, party: "TENANT" | "LANDLORD" | "ADMIN") {
+  const payment = escrowPayment(agreement);
+  const inEscrow = payment?.status === "IN_ESCROW";
+  const bothSigned = Boolean(agreement.tenantSignedAt && agreement.landlordSignedAt);
+  const open = !agreement.cancelledAt && !agreement.isHandoverConfirmed;
+  const openDispute = payment?.disputes.some((d) => d.status === "OPEN" || d.status === "UNDER_REVIEW") ?? false;
+  const actions: string[] = [];
+  if (!open || party === "ADMIN") return actions;
 
-  const startDate = new Date(body.tenancyStartDate);
-  const endDate = new Date(startDate);
-  endDate.setFullYear(endDate.getFullYear() + 1);
+  if (party === "TENANT" && !agreement.tenantSignedAt && inEscrow) actions.push("sign");
+  if (party === "LANDLORD" && !agreement.landlordSignedAt && inEscrow) actions.push("sign");
+  if (party === "LANDLORD" && bothSigned && inEscrow && !agreement.handoverMarkedAt) actions.push("markHandover");
+  if (party === "TENANT" && bothSigned && inEscrow && !agreement.moveInConfirmedAt && !openDispute) actions.push("confirmMoveIn");
+  if (inEscrow && !openDispute) actions.push("dispute");
+  if (party === "TENANT" && inEscrow && canTenantCancel(agreement, payment?.createdAt ?? null)) actions.push("cancel");
+  return actions;
+}
 
-  const agreementText = generateAgreementText({
-    landlordName: `${listing.landlord.firstName} ${listing.landlord.lastName}`,
-    tenantName: `${tenant.firstName} ${tenant.lastName}`,
-    propertyAddress: listing.property.address,
-    annualRent: listing.annualRent.toNumber(),
-    startDate,
-    endDate,
-  });
+function landlordSignDeadline(paidAt: Date) {
+  return addDays(paidAt, RENTAL_RULES.landlordSignDays);
+}
 
-  const qualifyingPayment = body.paymentId
-    ? await prisma.payment.findFirst({
-        where: {
-          id: body.paymentId,
-          listingId: body.listingId,
-          tenantId: body.tenantId,
-          status: "IN_ESCROW",
-        },
-      })
-    : null;
-  const acceptedInquiry = await prisma.inquiry.findFirst({
-    where: { listingId: body.listingId, tenantId: body.tenantId, status: "ACCEPTED" },
-  });
-  if (!qualifyingPayment && !acceptedInquiry) {
-    throw createError("An accepted inquiry or escrowed payment is required", 409);
-  }
+function canTenantCancel(agreement: Agreement, paidAt: Date | null) {
+  return Boolean(paidAt && !agreement.landlordSignedAt && landlordSignDeadline(paidAt) < new Date());
+}
 
-  const agreement = await prisma.$transaction(async (tx) => {
-    const created = await tx.tenancyAgreement.create({
-      data: {
-        listingId: body.listingId,
-        tenantId: body.tenantId,
-        landlordId,
-        agreementText,
-        tenancyStartDate: startDate,
-        tenancyEndDate: endDate,
-      },
-    });
-    if (qualifyingPayment) {
-      await tx.payment.update({
-        where: { id: qualifyingPayment.id },
-        data: { tenancyAgreementId: created.id },
-      });
-    }
-    return created;
-  });
+function serialize(agreement: Agreement, userId: string, role: UserRole) {
+  const party = partyOf(agreement, userId, role);
+  const payment = escrowPayment(agreement);
+  return {
+    ...agreement,
+    viewerRole: party,
+    payment,
+    landlordSignDeadline: payment && !agreement.landlordSignedAt ? landlordSignDeadline(payment.createdAt) : null,
+    availableActions: availableActions(agreement, party),
+  };
+}
 
-  await notificationsRepo.createNotification({
-    userId: body.tenantId,
-    type: "AGREEMENT_READY",
-    title: "Your tenancy agreement is ready",
-    body:
-      "Please review and sign your tenancy agreement for " +
-      listing.property.title,
-    data: { agreementId: agreement.id },
-  });
-
+async function load(id: string) {
+  const agreement = await tenancyRepo.findTenancyById(id);
+  if (!agreement) throw createError("Tenancy not found.", 404);
   return agreement;
 }
 
 export async function getMyTenancies(userId: string, role: UserRole) {
+  if (role === "ADMIN") throw createError("Use the admin view.", 403);
   return tenancyRepo.findTenanciesByUser(userId, role);
 }
 
-export async function getAgreement(id: string, userId: string) {
-  const agreement = await tenancyRepo.findTenancyById(id);
-  if (!agreement) throw createError("Agreement not found", 404);
-  if (agreement.tenantId !== userId && agreement.landlordId !== userId)
-    throw createError("Not authorised", 403);
-  return agreement;
+export async function getAgreement(id: string, userId: string, role: UserRole) {
+  return serialize(await load(id), userId, role);
 }
 
-export async function signAgreement(
-  id: string,
-  userId: string,
-  role: UserRole,
-) {
-  const agreement = await tenancyRepo.findTenancyById(id);
-  if (!agreement) throw createError("Agreement not found", 404);
-  if (agreement.tenantId !== userId && agreement.landlordId !== userId)
-    throw createError("Not authorised", 403);
+export async function signAgreement(id: string, userId: string, role: UserRole) {
+  const agreement = await load(id);
+  const party = partyOf(agreement, userId, role);
+  if (party === "ADMIN") throw createError("Admins can't sign tenancy agreements.", 403);
+  if (!availableActions(agreement, party).includes("sign")) throw createError("This agreement can't be signed right now.", 409);
 
-  if (role === "ADMIN") throw createError("Administrators cannot sign tenancy agreements", 403);
-  const actualRole = agreement.tenantId === userId ? "TENANT" : "LANDLORD";
-  if (role !== actualRole) throw createError("Role does not match agreement participant", 403);
-  if (
-    (actualRole === "TENANT" && agreement.tenantSignedAt) ||
-    (actualRole === "LANDLORD" && agreement.landlordSignedAt)
-  ) {
-    throw createError("Agreement is already signed by this participant", 409);
-  }
-  const updated = await tenancyRepo.signTenancy(id, actualRole);
+  await tenancyRepo.signTenancy(id, party);
+  const updated = await load(id);
+  const bothSigned = Boolean(updated.tenantSignedAt && updated.landlordSignedAt);
+  const title = updated.listing.property.title;
 
-  // Notify the other party when both have signed
-  if (updated.tenantSignedAt && updated.landlordSignedAt) {
-    const recipientId =
-      role === "TENANT" ? agreement.landlordId : agreement.tenantId;
-    await notificationsRepo.createNotification({
-      userId: recipientId,
-      type: "AGREEMENT_SIGNED",
-      title: "Tenancy agreement fully signed",
-      body: "Both parties have signed. The tenancy agreement is now complete.",
-      data: { agreementId: id },
+  if (bothSigned) {
+    await Promise.all([
+      notify({
+        userId: updated.landlordId,
+        type: "AGREEMENT_SIGNED",
+        title: "Agreement signed by both of you",
+        body: `Hand over the keys for ${title}, then mark the handover on Lettr.`,
+        link: `/tenancies/${id}`,
+        email: true,
+      }),
+      notify({
+        userId: updated.tenantId,
+        type: "AGREEMENT_SIGNED",
+        title: "Agreement signed by both of you",
+        body: `Arrange to collect the keys for ${title}. Confirm on Lettr once you have them.`,
+        link: `/tenancies/${id}`,
+        email: true,
+      }),
+    ]);
+  } else {
+    const signer = party === "TENANT" ? updated.tenant : updated.landlord;
+    await notify({
+      userId: party === "TENANT" ? updated.landlordId : updated.tenantId,
+      type: "AGREEMENT_READY",
+      title: `${signer.firstName} signed the agreement`,
+      body: `Your signature is the last one needed for ${title}.`,
+      link: `/tenancies/${id}`,
+      email: true,
+      actionLabel: "Review and sign",
     });
   }
-
-  return updated;
+  return serialize(updated, userId, role);
 }
 
-export async function confirmHandover(id: string, landlordId: string) {
-  const agreement = await tenancyRepo.findTenancyById(id);
-  if (!agreement) throw createError("Agreement not found", 404);
-  if (agreement.landlordId !== landlordId)
-    throw createError("Not authorised", 403);
-  if (!agreement.tenantSignedAt || !agreement.landlordSignedAt) {
-    throw createError("Both parties must sign before handover", 409);
+export async function markHandover(id: string, userId: string, role: UserRole) {
+  const agreement = await load(id);
+  const party = partyOf(agreement, userId, role);
+  if (party !== "LANDLORD" || !availableActions(agreement, party).includes("markHandover")) {
+    throw createError("Handover can be marked by the landlord once both of you have signed.", 409);
   }
-  if (agreement.isHandoverConfirmed) return agreement;
-  const payment = await prisma.payment.findFirst({
-    where: { tenancyAgreementId: id, status: "IN_ESCROW" },
+  const now = new Date();
+  const start = agreement.tenancyStartDate && agreement.tenancyStartDate > now ? agreement.tenancyStartDate : now;
+  const autoReleaseAt = addDays(start, RENTAL_RULES.autoReleaseDays);
+  await prisma.tenancyAgreement.update({ where: { id }, data: { handoverMarkedAt: now, autoReleaseAt } });
+
+  await notify({
+    userId: agreement.tenantId,
+    type: "HANDOVER_CONFIRMED",
+    title: "Do you have the keys?",
+    body: `${agreement.landlord.firstName} says the keys to ${agreement.listing.property.title} were handed over. Confirm on Lettr, or raise a dispute if something's wrong. Otherwise escrow releases on ${formatAppointment(autoReleaseAt)}.`,
+    link: `/tenancies/${id}`,
+    email: true,
+    actionLabel: "Confirm move-in",
   });
-  if (!payment) throw createError("An escrowed payment is required before handover", 409);
-  const updated = await tenancyRepo.confirmTenancyHandover(id);
-  await paymentsService.releaseEscrow(payment.id, landlordId, "LANDLORD");
-  return updated;
+  return serialize(await load(id), userId, role);
+}
+
+export async function confirmMoveIn(id: string, userId: string, role: UserRole) {
+  const agreement = await load(id);
+  const party = partyOf(agreement, userId, role);
+  if (party !== "TENANT" || !availableActions(agreement, party).includes("confirmMoveIn")) {
+    throw createError("You can confirm move-in once both of you have signed.", 409);
+  }
+  const now = new Date();
+  await prisma.tenancyAgreement.update({
+    where: { id },
+    data: { moveInConfirmedAt: now, handoverMarkedAt: agreement.handoverMarkedAt ?? now },
+  });
+
+  const payment = escrowPayment(agreement);
+  if (payment) {
+    try {
+      await paymentsService.releaseEscrow(payment.id, "TENANT_CONFIRMED");
+    } catch (error) {
+      // Recorded on the payment; the scheduler retries the payout.
+      console.error(`Release after move-in failed for payment ${payment.id}:`, error);
+    }
+  }
+  return serialize(await load(id), userId, role);
+}
+
+export async function cancelTenancy(id: string, userId: string, role: UserRole, reason: string) {
+  const agreement = await load(id);
+  const party = partyOf(agreement, userId, role);
+  if (party !== "TENANT" || !availableActions(agreement, party).includes("cancel")) {
+    throw createError(
+      `You can cancel for a full refund if the landlord hasn't signed within ${RENTAL_RULES.landlordSignDays} days of your payment.`,
+      409,
+    );
+  }
+  const payment = escrowPayment(agreement)!;
+  await paymentsService.refundPayment(payment.id, { reason: `The landlord didn't sign in time. ${reason}` });
+  await notify({
+    userId: agreement.landlordId,
+    type: "SYSTEM",
+    title: "Tenancy cancelled",
+    body: `${agreement.tenant.firstName} cancelled because the agreement for ${agreement.listing.property.title} wasn't signed in time. The listing is active again.`,
+    link: `/landlord/listings`,
+    email: true,
+  });
+  return serialize(await load(id), userId, role);
 }

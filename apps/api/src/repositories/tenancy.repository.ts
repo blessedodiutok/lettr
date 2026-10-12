@@ -1,51 +1,56 @@
-// File: apps/api/src/repositories/tenancy.repository.ts
-// All Prisma queries for the tenancy agreements domain
+// Prisma queries for tenancy agreements.
 
 import type { Prisma, UserRole } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
+const PERSON = { select: { id: true, firstName: true, lastName: true, avatarUrl: true, email: true, phone: true } } as const;
+
 const TENANCY_INCLUDE = {
   listing: {
-    include: {
+    select: {
+      id: true,
+      status: true,
+      annualRent: true,
+      cautionFee: true,
+      serviceCharge: true,
+      minimumLeaseTerm: true,
       property: {
-        include: {
-          photos: { where: { isCover: true }, take: 1 },
+        select: {
+          title: true,
+          address: true,
+          neighbourhood: true,
+          lga: true,
+          state: true,
+          propertyType: true,
+          photos: { where: { isCover: true }, take: 1, select: { url: true } },
         },
       },
     },
   },
-  tenant: {
-    select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-  },
-  landlord: {
-    select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+  tenant: PERSON,
+  landlord: PERSON,
+  payments: {
+    orderBy: { createdAt: "desc" as const },
+    select: {
+      id: true,
+      status: true,
+      totalAmount: true,
+      platformFee: true,
+      createdAt: true,
+      escrowReleasedAt: true,
+      releaseError: true,
+      refundedAt: true,
+      receipt: { select: { receiptNumber: true } },
+      disputes: { select: { id: true, status: true, reason: true, outcome: true, resolution: true, createdAt: true } },
+    },
   },
 } satisfies Prisma.TenancyAgreementInclude;
 
-export async function createTenancyAgreement(
-  data: Prisma.TenancyAgreementUncheckedCreateInput,
-) {
-  return prisma.tenancyAgreement.create({
-    data,
-    include: TENANCY_INCLUDE,
-  });
+export function findTenancyById(id: string) {
+  return prisma.tenancyAgreement.findUnique({ where: { id }, include: TENANCY_INCLUDE });
 }
 
-export async function findTenancyById(id: string) {
-  return prisma.tenancyAgreement.findUnique({
-    where: { id },
-    include: {
-      ...TENANCY_INCLUDE,
-      listing: {
-        include: {
-          property: true,
-        },
-      },
-    },
-  });
-}
-
-export async function findTenanciesByUser(userId: string, role: UserRole) {
+export function findTenanciesByUser(userId: string, role: UserRole) {
   return prisma.tenancyAgreement.findMany({
     where: role === "TENANT" ? { tenantId: userId } : { landlordId: userId },
     include: TENANCY_INCLUDE,
@@ -53,36 +58,9 @@ export async function findTenanciesByUser(userId: string, role: UserRole) {
   });
 }
 
-export async function signTenancy(id: string, role: UserRole) {
-  const data =
-    role === "TENANT"
-      ? { tenantSignedAt: new Date() }
-      : { landlordSignedAt: new Date() };
-
+export function signTenancy(id: string, party: "TENANT" | "LANDLORD") {
   return prisma.tenancyAgreement.update({
     where: { id },
-    data,
-    include: TENANCY_INCLUDE,
-  });
-}
-
-export async function confirmTenancyHandover(id: string) {
-  return prisma.tenancyAgreement.update({
-    where: { id },
-    data: {
-      isHandoverConfirmed: true,
-      handoverConfirmedAt: new Date(),
-    },
-    include: TENANCY_INCLUDE,
-  });
-}
-
-export async function findActiveTenancyForListing(listingId: string) {
-  return prisma.tenancyAgreement.findFirst({
-    where: {
-      listingId,
-      isHandoverConfirmed: false,
-    },
-    include: TENANCY_INCLUDE,
+    data: party === "TENANT" ? { tenantSignedAt: new Date() } : { landlordSignedAt: new Date() },
   });
 }

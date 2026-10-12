@@ -1,6 +1,5 @@
-// File: apps/api/src/middleware/errorHandler.ts
-// Global Express 5 error handler — the last middleware in app.ts
-// Any error thrown or passed to next(err) in a route ends up here
+// Global Express 5 error handler — the last middleware in app.ts.
+// Any error thrown or passed to next(err) in a route ends up here.
 
 import { Prisma } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
@@ -9,86 +8,68 @@ import { env } from "../config/env.js";
 
 export interface AppError extends Error {
   statusCode?: number;
+  /** Machine-readable reason clients can branch on, e.g. EMAIL_NOT_VERIFIED. */
   code?: string;
+  /** Extra non-sensitive data for the client, e.g. the userId to verify. */
+  data?: Record<string, unknown>;
 }
 
-export function errorHandler(
-  err: AppError,
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
-): void {
-  // Zod validation errors — malformed request body/query
+export function errorHandler(err: AppError, req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof ZodError) {
     res.status(400).json({
       success: false,
-      error: "Validation failed",
-      details: err.issues.map((issue) => ({
-        field: issue.path.join("."),
-        message: issue.message,
-      })),
+      error: err.issues[0]?.message ?? "Check the highlighted fields",
+      code: "VALIDATION_FAILED",
+      details: err.issues.map((issue) => ({ field: issue.path.join("."), message: issue.message })),
     });
     return;
   }
 
-  // Prisma known errors — database constraint violations
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === "P2002") {
-      // Unique constraint violation (e.g. email already registered)
-      const field = (err.meta?.target as string[])?.join(", ") ?? "field";
-      res.status(409).json({
-        success: false,
-        error: `A record with this ${field} already exists`,
-      });
+      res.status(409).json({ success: false, error: "That already exists.", code: "DUPLICATE" });
       return;
     }
     if (err.code === "P2025") {
-      // Record not found
-      res.status(404).json({
-        success: false,
-        error: "Record not found",
-      });
+      res.status(404).json({ success: false, error: "We couldn't find that.", code: "NOT_FOUND" });
       return;
     }
   }
 
-  // JWT errors
-  if (err.name === "JsonWebTokenError") {
-    res.status(401).json({ success: false, error: "Invalid token" });
-    return;
-  }
-  if (err.name === "TokenExpiredError") {
-    res.status(401).json({ success: false, error: "Token expired" });
-    return;
-  }
-
-  // Multer errors (file upload issues)
   if (err.name === "MulterError") {
-    res.status(400).json({ success: false, error: err.message });
+    const message = (err as AppError & { code?: string }).code === "LIMIT_FILE_SIZE" ? "That file is too large." : err.message;
+    res.status(400).json({ success: false, error: message, code: "UPLOAD_REJECTED" });
     return;
   }
 
-  // App-level errors with a specific status code
-  const statusCode = err.statusCode ?? 500;
+  // Body-parser errors (malformed JSON, payload too large) carry a status.
+  const parserStatus = (err as { status?: number }).status;
+  const statusCode = err.statusCode ?? (parserStatus && parserStatus < 500 ? parserStatus : 500);
   const message =
-    statusCode === 500 && env.NODE_ENV === "production"
-      ? "An unexpected error occurred"
-      : err.message;
+    statusCode === 500 && env.NODE_ENV === "production" ? "Something went wrong on our side. Please try again." : err.message;
 
-  if (statusCode === 500) {
-    console.error("Unhandled error:", err);
+  if (statusCode >= 500) {
+    console.error(`[${req.method} ${req.originalUrl}]`, err);
   }
 
   res.status(statusCode).json({
     success: false,
     error: message,
-    ...(env.NODE_ENV === "development" && { stack: err.stack }),
+    ...(err.code && { code: err.code }),
+    ...(err.data && { data: err.data }),
+    ...(env.NODE_ENV === "development" && statusCode >= 500 && { stack: err.stack }),
   });
 }
 
-/** Helper to create typed app errors with status codes */
-export function createError(message: string, statusCode: number): AppError {
+/** Create an error with an HTTP status, and optionally a code and client data. */
+export function createError(
+  message: string,
+  statusCode: number,
+  extra?: { code?: string; data?: Record<string, unknown> },
+): AppError {
   const error: AppError = new Error(message);
   error.statusCode = statusCode;
+  if (extra?.code) error.code = extra.code;
+  if (extra?.data) error.data = extra.data;
   return error;
 }

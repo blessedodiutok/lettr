@@ -11,6 +11,8 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "lettr-source": "./src/index.ts",
+      "react-native": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -22,9 +24,11 @@
     "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "@lettr/types": "workspace:*"
   },
   "devDependencies": {
     "typescript": "6.0.3"
-  }
+  },
+  "react-native": "./src/index.ts"
 }

@@ -1,85 +1,50 @@
-import type { NextFunction, Request, Response } from "express";
+// HTTP handlers for /api/payments
+
+import type { Request, Response } from "express";
 import * as paymentsService from "../services/payments.service.js";
 
-export async function initiatePayment(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await paymentsService.initiatePayment(req.body, req.user!.id);
-    res.status(201).json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+const ok = (res: Response, data: unknown, status = 200) => res.status(status).json({ success: true, data });
+const id = (req: Request) => String(req.params.id);
+
+export async function initiatePayment(req: Request, res: Response) {
+  ok(res, await paymentsService.initiatePayment(req.body, req.user!.id), 201);
 }
 
-export async function paystackWebhook(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    if (!Buffer.isBuffer(req.body)) {
-      res.status(400).json({ success: false, error: "Raw webhook body required" });
-      return;
-    }
-
-    const signature = req.headers["x-paystack-signature"];
-    if (typeof signature !== "string") {
-      res.status(401).json({ success: false, error: "Missing Paystack signature" });
-      return;
-    }
-
-    await paymentsService.handlePaystackWebhook(req.body, signature);
-    res.sendStatus(200);
-  } catch (error) {
-    next(error);
+/** Paystack calls this with a raw JSON body; the signature is checked in the service. */
+export async function paystackWebhook(req: Request, res: Response) {
+  const signature = req.headers["x-paystack-signature"];
+  if (!Buffer.isBuffer(req.body) || typeof signature !== "string") {
+    res.status(400).json({ success: false, error: "Invalid webhook request" });
+    return;
   }
+  await paymentsService.handlePaystackWebhook(req.body, signature);
+  res.sendStatus(200);
 }
 
-export async function releaseEscrow(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await paymentsService.releaseEscrow(String(req.params.id), req.user!.id, req.user!.role);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function verifyPayment(req: Request, res: Response) {
+  ok(res, await paymentsService.verifyPayment(id(req), req.user!.id, req.user!.role));
 }
 
-export async function getMyPayments(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await paymentsService.getMyPayments(req.user!.id, req.user!.role);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function simulateSuccess(req: Request, res: Response) {
+  ok(res, await paymentsService.simulateSuccess(id(req), req.user!.id));
 }
 
-export async function getPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await paymentsService.getPayment(String(req.params.id), req.user!.id, req.user!.role);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function releaseEscrow(req: Request, res: Response) {
+  ok(res, await paymentsService.releaseEscrow(id(req), "ADMIN"));
 }
 
-export async function verifyPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await paymentsService.verifyPayment(String(req.params.id), req.user!.id, req.user!.role);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function refundPayment(req: Request, res: Response) {
+  ok(res, await paymentsService.refundPayment(id(req), { amount: req.body.amount, reason: req.body.reason, actorId: req.user!.id }));
 }
 
-export async function refundPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await paymentsService.refundPayment(String(req.params.id), req.body.amount, req.body.reason, req.user!.id);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function createDispute(req: Request, res: Response) {
+  ok(res, await paymentsService.createDispute(id(req), req.user!.id, req.body.reason), 201);
 }
 
-export async function createDispute(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await paymentsService.createDispute(String(req.params.id), req.user!.id, req.body.reason);
-    res.status(201).json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function getMyPayments(req: Request, res: Response) {
+  ok(res, await paymentsService.getMyPayments(req.user!.id, req.user!.role));
+}
+
+export async function getPayment(req: Request, res: Response) {
+  ok(res, await paymentsService.getPayment(id(req), req.user!.id, req.user!.role));
 }

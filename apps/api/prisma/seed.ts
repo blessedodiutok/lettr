@@ -11,6 +11,7 @@ import {
   UserRole,
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { samplePhotosFor } from "./dev/samplePhotos.js";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
@@ -25,7 +26,8 @@ async function hashPassword(password: string): Promise<string> {
 // ── Main seed function ─────────────────────────────────────────────────────
 
 async function main() {
-  console.info("🌱 Starting Lettr database seed...");
+  if (process.env.NODE_ENV === "production") throw new Error("The demo seed wipes data and must not run in production");
+  console.info("🌱 Starting Lettr database seed (this deletes ALL existing data)...");
 
   // Clean existing data in correct dependency order
   await prisma.notification.deleteMany();
@@ -40,12 +42,26 @@ async function main() {
   await prisma.propertyPhoto.deleteMany();
   await prisma.listing.deleteMany();
   await prisma.property.deleteMany();
+  await prisma.adminAction.deleteMany();
+  await prisma.paymentDispute.deleteMany();
+  await prisma.message.deleteMany();
   await prisma.verificationDocument.deleteMany();
   await prisma.landlordProfile.deleteMany();
   await prisma.tenantProfile.deleteMany();
   await prisma.user.deleteMany();
 
   const defaultPassword = await hashPassword("Lettr@2024!");
+
+  await prisma.user.create({
+    data: {
+      email: "admin@lettr-test.com",
+      passwordHash: defaultPassword,
+      role: UserRole.ADMIN,
+      firstName: "Lettr",
+      lastName: "Admin",
+      isEmailVerified: true,
+    },
+  });
 
   // ── Create Landlords ──────────────────────────────────────────────────────
 
@@ -557,55 +573,7 @@ async function main() {
   ];
 
   // Cloudinary placeholder photo URLs (realistic Cloudinary format)
-  const photoSets: string[][] = [
-    [
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/lekki-3bed-living.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/lekki-3bed-kitchen.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/lekki-3bed-master.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/lekki-3bed-exterior.jpg",
-    ],
-    [
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/ikeja-2bed-living.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/ikeja-2bed-bedroom.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/ikeja-2bed-kitchen.jpg",
-    ],
-    [
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/yaba-selfcon-room.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/yaba-selfcon-bathroom.jpg",
-    ],
-    [
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/banana-duplex-exterior.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/banana-duplex-living.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/banana-duplex-pool.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/banana-duplex-kitchen.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/banana-duplex-master.jpg",
-    ],
-    [
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/surulere-mini-living.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/surulere-mini-bedroom.jpg",
-    ],
-    [
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/ajah-1bed-living.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/ajah-1bed-bedroom.jpg",
-    ],
-    [
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/maitama-3bed-living.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/maitama-3bed-terrace.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/maitama-3bed-master.jpg",
-    ],
-    [
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/wuse-2bed-living.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/wuse-2bed-bedroom.jpg",
-    ],
-    [
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/ph-duplex-exterior.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/ph-duplex-living.jpg",
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/ph-duplex-kitchen.jpg",
-    ],
-    [
-      "https://res.cloudinary.com/lettr/image/upload/v1/listings/ph-bq-room.jpg",
-    ],
-  ];
+  const photoSets: string[][] = listingsData.map((_, index) => samplePhotosFor(index, 4));
 
   for (let i = 0; i < listingsData.length; i++) {
     const data = listingsData[i];
@@ -709,6 +677,7 @@ async function main() {
   console.info("   Tenant 1:   tunde@lettr-test.com");
   console.info("   Tenant 2:   ngozi@lettr-test.com");
   console.info("   Tenant 3:   chidi@lettr-test.com");
+  console.info("   Admin:      admin@lettr-test.com");
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────

@@ -24,10 +24,8 @@ function createPrismaClient(): PrismaClient {
 
   return new PrismaClient({
     adapter,
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
+    // Set PRISMA_LOG_QUERIES=true to print every SQL query while debugging.
+    log: process.env.PRISMA_LOG_QUERIES === "true" ? ["query", "warn", "error"] : ["warn", "error"],
   });
 }
 

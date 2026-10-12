@@ -187,6 +187,7 @@ model User {
     disputesResolved    PaymentDispute[]        @relation("DisputeResolvedBy")
     maintenanceRequests MaintenanceRequest[]
     properties          Property[]             @relation("LandlordProperties")
+    adminActions        AdminAction[]
 
     @@index([email])
     @@index([role])
@@ -213,6 +214,8 @@ model LandlordProfile {
     bankAccountName        String?
     bankAccountNumber      String?
     bankCode               String? // Paystack bank code for disbursement
+    bankName               String?
+    bankAccountVerifiedAt  DateTime? // Set when Paystack resolves the account name
     paystackSubAccountCode String? // Paystack subaccount for split payments
     createdAt              DateTime           @default(now())
     updatedAt              DateTime           @updatedAt
@@ -388,6 +391,14 @@ model Inquiry {
     landlord          User               @relation("LandlordInquiries", fields: [landlordId], references: [id], onDelete: Restrict, map: "fk_inquiry_landlord")
     status            InquiryStatus      @default(OPEN)
     initialMessage    String // Tenant's first message
+    offerMadeAt       DateTime?
+    offerExpiresAt    DateTime? // Offer lapses if not accepted by then
+    offerNote         String?
+    acceptedAt        DateTime?
+    paymentDueAt      DateTime? // Accepted offer lapses if unpaid by then
+    closedAt          DateTime?
+    closedReason      String?
+    payments          Payment[]
     messages          Message[]
     inspectionBooking InspectionBooking?
     createdAt         DateTime           @default(now())
@@ -427,6 +438,7 @@ model InspectionBooking {
     inquiry            Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade, map: "fk_inspection_inquiry")
     scheduledAt        DateTime
     notes              String?
+    proposedById       String?
     isConfirmed        Boolean  @default(false)
     isCompleted        Boolean  @default(false)
     cancellationReason String?
@@ -455,8 +467,14 @@ model TenancyAgreement {
     landlordSignedAt    DateTime?
     tenancyStartDate    DateTime?
     tenancyEndDate      DateTime?
-    handoverConfirmedAt DateTime?
+    handoverConfirmedAt DateTime? // When escrow release was triggered (tenant confirmation or auto)
     isHandoverConfirmed Boolean   @default(false)
+    handoverMarkedAt    DateTime? // Landlord says the keys were handed over
+    moveInConfirmedAt   DateTime? // Tenant confirms they have the keys
+    autoReleaseAt       DateTime? // Escrow releases automatically after this unless disputed
+    releaseMethod       String? // TENANT_CONFIRMED | AUTO | ADMIN
+    cancelledAt         DateTime?
+    cancellationReason  String?
     payments            Payment[]
     createdAt           DateTime  @default(now())
     updatedAt           DateTime  @updatedAt
@@ -479,10 +497,14 @@ model Payment {
     tenantId            String
     tenant              User              @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_payment_tenant")
     tenancyAgreementId  String?
+    inquiryId           String?
+    inquiry             Inquiry?          @relation(fields: [inquiryId], references: [id], onDelete: SetNull, map: "fk_payment_inquiry")
     tenancyAgreement    TenancyAgreement? @relation(fields: [tenancyAgreementId], references: [id], map: "fk_payment_tenancy")
     status              PaymentStatus     @default(PENDING)
     annualRent          Decimal           @db.Decimal(14, 2)
     cautionFee          Decimal           @db.Decimal(14, 2)
+    serviceCharge       Decimal           @default(0) @db.Decimal(14, 2)
+    legalFee            Decimal           @default(0) @db.Decimal(14, 2)
     platformFee         Decimal           @db.Decimal(14, 2)
     agentFeeSaved       Decimal           @db.Decimal(14, 2)
     totalAmount         Decimal           @db.Decimal(14, 2)
@@ -495,6 +517,9 @@ model Payment {
     transferReference    String?          @unique
     refundedAt          DateTime?
     refundReason        String?
+    refundAmount        Decimal?          @db.Decimal(14, 2)
+    releaseAttempts     Int               @default(0)
+    releaseError        String?
     receipt             Receipt?
     disputes            PaymentDispute[]
     createdAt           DateTime          @default(now())
@@ -504,6 +529,7 @@ model Payment {
     @@index([listingId])
     @@index([status])
     @@index([paystackReference])
+    @@index([inquiryId])
     @@map("payments")
 }
 
@@ -516,6 +542,7 @@ model PaymentDispute {
     reason       String
     status       DisputeStatus @default(OPEN)
     resolution   String?
+    outcome      String? // REFUND_TENANT | RELEASE_TO_LANDLORD | NO_ACTION
     resolvedById String?
     resolvedBy   User?         @relation("DisputeResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
     resolvedAt   DateTime?
@@ -657,4 +684,26 @@ model VerificationDocument {
     @@index([userId])
     @@index([status])
     @@map("verification_documents")
+}
+
+// ─────────────────────────────────────────────
+// ADMIN AUDIT LOG
+// Every moderation and money action an admin takes
+// ─────────────────────────────────────────────
+
+model AdminAction {
+    id         String   @id @default(cuid())
+    adminId    String
+    admin      User     @relation(fields: [adminId], references: [id], onDelete: Restrict, map: "fk_admin_action_admin")
+    action     String // e.g. VERIFICATION_APPROVED, LISTING_SUSPENDED, DISPUTE_RESOLVED
+    targetType String // USER | LISTING | PAYMENT | DISPUTE | VERIFICATION
+    targetId   String
+    reason     String?
+    metadata   Json?
+    createdAt  DateTime @default(now())
+
+    @@index([adminId])
+    @@index([targetType, targetId])
+    @@index([createdAt])
+    @@map("admin_actions")
 }

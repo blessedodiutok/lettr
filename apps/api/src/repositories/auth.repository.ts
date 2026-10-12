@@ -34,11 +34,16 @@ export async function findUserWithProfile(id: string) {
       avatarUrl: true,
       isEmailVerified: true,
       isPhoneVerified: true,
+      isActive: true,
       createdAt: true,
       landlordProfile: true,
       tenantProfile: true,
     },
   });
+}
+
+export async function updatePassword(id: string, passwordHash: string) {
+  return prisma.user.update({ where: { id }, data: { passwordHash } });
 }
 
 export async function createUser(input: CreateUserInput) {

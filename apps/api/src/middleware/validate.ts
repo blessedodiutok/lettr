@@ -1,36 +1,30 @@
-// File: apps/api/src/middleware/validate.ts
-// Zod 4 request validator middleware
-// Validates req.body, req.query, and req.params against a Zod schema
-// Throws 400 with field-level error details on failure
+// Zod request validator. Replaces req.body/query/params with the parsed values.
+// Express 5 exposes req.query as a read-only getter, so parsed values are
+// defined as own properties that shadow it instead of being assigned.
 
 import type { NextFunction, Request, Response } from "express";
-import type { ZodTypeAny } from "zod";
+import type { ZodType } from "zod";
 
 interface ValidationSchemas {
-  body?: ZodTypeAny;
-  query?: ZodTypeAny;
-  params?: ZodTypeAny;
+  body?: ZodType;
+  query?: ZodType;
+  params?: ZodType;
 }
 
-/**
- * Validate request data against Zod schemas
- * Usage: router.post('/', validate({ body: CreateListingSchema }), controller)
- */
+function replace(req: Request, key: "query" | "params", value: unknown) {
+  Object.defineProperty(req, key, { value, writable: true, configurable: true, enumerable: true });
+}
+
+/** Usage: router.post('/', validate({ body: CreateListingSchema }), controller) */
 export function validate(schemas: ValidationSchemas) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     try {
-      if (schemas.body) {
-        req.body = schemas.body.parse(req.body);
-      }
-      if (schemas.query) {
-        req.query = schemas.query.parse(req.query) as Request["query"];
-      }
-      if (schemas.params) {
-        req.params = schemas.params.parse(req.params) as Request["params"];
-      }
+      if (schemas.body) req.body = schemas.body.parse(req.body ?? {});
+      if (schemas.query) replace(req, "query", schemas.query.parse(req.query));
+      if (schemas.params) replace(req, "params", schemas.params.parse(req.params));
       next();
     } catch (error) {
-      next(error); // ZodError caught by errorHandler.ts
+      next(error); // ZodError is formatted by errorHandler.ts
     }
   };
 }

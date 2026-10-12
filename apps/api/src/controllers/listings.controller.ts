@@ -1,112 +1,61 @@
-import type { NextFunction, Request, Response } from "express";
+// HTTP handlers for /api/listings
+
+import type { Request, Response } from "express";
 import * as listingsService from "../services/listings.service.js";
 
-type StringQuery = Record<string, string | undefined>;
+type SearchQuery = Parameters<typeof listingsService.searchListings>[0];
 
-export async function searchListings(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.searchListings(req.query as StringQuery, req.user?.id);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+const ok = (res: Response, data: unknown, status = 200) => res.status(status).json({ success: true, data });
+const id = (req: Request) => String(req.params.id);
+
+export async function searchListings(req: Request, res: Response) {
+  ok(res, await listingsService.searchListings(req.query as unknown as SearchQuery, req.user?.id));
 }
 
-export async function getMapListings(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.getMapListings(req.query as StringQuery);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function getMapListings(req: Request, res: Response) {
+  ok(res, await listingsService.getMapListings(req.query as unknown as SearchQuery));
 }
 
-export async function getListing(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.getListing(String(req.params.id), req.user?.id);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function getListing(req: Request, res: Response) {
+  ok(res, await listingsService.getListing(id(req), req.user?.id, req.user?.role));
 }
 
-export async function createListing(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.createListing(req.body, req.user!.id);
-    res.status(201).json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function createListing(req: Request, res: Response) {
+  ok(res, await listingsService.createListing(req.body, req.user!.id), 201);
 }
 
-export async function updateListing(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.updateListing(String(req.params.id), req.body, req.user!.id);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function updateListing(req: Request, res: Response) {
+  ok(res, await listingsService.updateListing(id(req), req.body, req.user!.id));
 }
 
-export async function deleteListing(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.deleteListing(String(req.params.id), req.user!.id);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function deleteListing(req: Request, res: Response) {
+  ok(res, await listingsService.deleteListing(id(req), req.user!.id));
 }
 
-export async function publishListing(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.publishListing(String(req.params.id), req.user!.id);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function publishListing(req: Request, res: Response) {
+  ok(res, await listingsService.publishListing(id(req), req.user!.id));
 }
 
-export async function archiveListing(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.archiveListing(String(req.params.id), req.user!.id);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function archiveListing(req: Request, res: Response) {
+  ok(res, await listingsService.archiveListing(id(req), req.user!.id));
 }
 
-export async function saveListing(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.saveListing(String(req.params.id), req.user!.id);
-    res.status(201).json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function saveListing(req: Request, res: Response) {
+  ok(res, await listingsService.saveListing(id(req), req.user!.id), 201);
 }
 
-export async function unsaveListing(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.unsaveListing(String(req.params.id), req.user!.id);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function unsaveListing(req: Request, res: Response) {
+  ok(res, await listingsService.unsaveListing(id(req), req.user!.id));
 }
 
-export async function getSavedListings(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.getSavedListings(req.user!.id);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function getSavedListings(req: Request, res: Response) {
+  ok(res, await listingsService.getSavedListings(req.user!.id));
 }
 
-export async function getMyListings(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const result = await listingsService.getMyListings(req.user!.id);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+export async function getMyListings(req: Request, res: Response) {
+  ok(res, await listingsService.getMyListings(req.user!.id));
+}
+
+export async function getMyListing(req: Request, res: Response) {
+  ok(res, await listingsService.getMyListing(id(req), req.user!.id));
 }

@@ -1,29 +1,20 @@
-// File: apps/api/src/routes/tenancy.ts
-// Base: /api/tenancy
-// Authenticated: POST / (landlord), GET /:id, POST /:id/sign, POST /:id/handover
+// Base: /api/tenancy — agreements are created automatically when rent reaches escrow.
 
-import { CreateTenancyAgreementSchema } from "@lettr/zod-schemas";
+import { CancelTenancySchema } from "@lettr/zod-schemas";
 import { Router } from "express";
-import * as tenancyController from "../controllers/tenancy.controller.js";
+import * as controller from "../controllers/tenancy.controller.js";
 import { authenticate } from "../middleware/auth.js";
 import { requireRole } from "../middleware/roles.js";
 import { validate } from "../middleware/validate.js";
 
 const router: Router = Router();
-router.post(
-  "/",
-  authenticate,
-  requireRole("LANDLORD"),
-  validate({ body: CreateTenancyAgreementSchema }),
-  tenancyController.createAgreement,
-);
-router.get("/my", authenticate, tenancyController.getMyTenancies);
-router.get("/:id", authenticate, tenancyController.getAgreement);
-router.post("/:id/sign", authenticate, tenancyController.signAgreement);
-router.post(
-  "/:id/handover",
-  authenticate,
-  requireRole("LANDLORD"),
-  tenancyController.confirmHandover,
-);
+router.use(authenticate);
+
+router.get("/my", controller.getMyTenancies);
+router.get("/:id", controller.getAgreement);
+router.post("/:id/sign", requireRole("TENANT", "LANDLORD"), controller.signAgreement);
+router.post("/:id/handover", requireRole("LANDLORD"), controller.markHandover);
+router.post("/:id/confirm-move-in", requireRole("TENANT"), controller.confirmMoveIn);
+router.post("/:id/cancel", requireRole("TENANT"), validate({ body: CancelTenancySchema }), controller.cancelTenancy);
+
 export default router;

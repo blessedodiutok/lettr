@@ -1,8 +1,13 @@
 {
-  "watch": ["src"],
+  "watch": [
+    "src"
+  ],
   "ext": "ts,json",
-  "ignore": ["src/**/*.test.ts", "dist"],
-  "exec": "tsx --env-file=.env src/index.ts",
+  "ignore": [
+    "src/**/*.test.ts",
+    "dist"
+  ],
+  "exec": "tsx --conditions=lettr-source --env-file=.env src/index.ts",
   "env": {
     "NODE_ENV": "development"
   }

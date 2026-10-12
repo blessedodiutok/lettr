@@ -1,46 +1,35 @@
-// File: apps/api/src/index.ts
-// Server entry point — loads env, connects Prisma and Redis, starts HTTP server
+// Server entry point — connects the database and key-value store, starts HTTP and the scheduler.
 
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { getFirebaseApp } from "./lib/firebase.js";
 import { prisma } from "./lib/prisma.js";
-import { getRedis } from "./lib/redis.js";
-
-const PORT = env.PORT;
+import { getStore } from "./lib/redis.js";
+import { startScheduler } from "./jobs/scheduler.js";
 
 async function bootstrap(): Promise<void> {
-  // Connect to PostgreSQL via Prisma
   await prisma.$connect();
   console.info("✅ Prisma connected to PostgreSQL");
-
-  // Connect to Redis
-  const redis = getRedis();
-  await redis.connect();
-
-  // Initialise Firebase (non-fatal if credentials missing)
+  await getStore().connect();
   getFirebaseApp();
 
-  // Create and start the Express app
   const app = createApp();
-
-  const server = app.listen(PORT, () => {
-    console.info(`🚀 Lettr API running on http://localhost:${PORT}`);
-    console.info(`   Environment: ${env.NODE_ENV}`);
-    console.info(`   Health:      http://localhost:${PORT}/api/health`);
+  const server = app.listen(env.PORT, () => {
+    console.info(`🚀 Lettr API running on http://localhost:${env.PORT} (${env.NODE_ENV})`);
   });
+  const stopScheduler = startScheduler();
 
-  // Graceful shutdown — close connections cleanly on CTRL+C or process kill
-  const shutdown = async (signal: string): Promise<void> => {
+  const shutdown = (signal: string) => {
     console.info(`\n${signal} received — shutting down gracefully...`);
+    stopScheduler();
     server.close(async () => {
       await prisma.$disconnect();
-      await getRedis().quit();
-      console.info("✅ Shutdown complete");
+      await getStore().quit();
       process.exit(0);
     });
+    // Don't hang forever on open keep-alive connections.
+    setTimeout(() => process.exit(1), 10_000).unref();
   };
-
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
 }

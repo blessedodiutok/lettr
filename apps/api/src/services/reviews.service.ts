@@ -5,6 +5,7 @@
 import { prisma } from "../lib/prisma.js";
 import { createError } from "../middleware/errorHandler.js";
 import * as reviewsRepo from "../repositories/reviews.repository.js";
+import { notify } from "./notify.js";
 
 export async function createReview(
   body: {
@@ -33,10 +34,16 @@ export async function createReview(
     select: { listingId: true },
   });
   if (!tenancy) {
-    throw createError("Reviews require a completed tenancy", 403);
+    throw createError("You can review someone once a tenancy between you has started.", 403);
   }
 
-  return prisma.$transaction(async (tx) => {
+  const existing = await prisma.review.findFirst({
+    where: { reviewerId, revieweeId: body.revieweeId, listingId: body.listingId ?? tenancy.listingId },
+    select: { id: true },
+  });
+  if (existing) throw createError("You've already reviewed this tenancy.", 409);
+
+  const review = await prisma.$transaction(async (tx) => {
     const review = await tx.review.create({
       data: {
         ...body,
@@ -71,6 +78,15 @@ export async function createReview(
     }
     return review;
   });
+
+  await notify({
+    userId: body.revieweeId,
+    type: "REVIEW_RECEIVED",
+    title: `${review.reviewer.firstName} left you a ${body.rating}-star review`,
+    body: body.title,
+    link: "/settings",
+  });
+  return review;
 }
 
 export async function getListingReviews(listingId: string) {
