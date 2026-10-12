@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCurrency } from "@lettr/utils";
+import { formatCurrency, getStatusMeta } from "@lettr/utils";
 import Link from "next/link";
 import { Card, ErrorState, PageHeader, Skeleton } from "../../../components/ui/display";
 import { useAdminOverview } from "../../../hooks/useAdmin";
@@ -61,7 +61,7 @@ export default function AdminOverviewPage() {
           <dl className="mt-3 grid gap-2 text-sm">
             {Object.entries(data.listings).map(([status, count]) => (
               <div key={status} className="flex justify-between">
-                <dt className="text-muted">{status.replace("_", " ").toLowerCase()}</dt>
+                <dt className="text-muted">{getStatusMeta("listing", status).label}</dt>
                 <dd className="tnum font-semibold">{count}</dd>
               </div>
             ))}
