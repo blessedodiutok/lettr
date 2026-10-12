@@ -76,7 +76,8 @@ export async function resendOtp(req: Request, res: Response) {
 export async function refresh(req: Request, res: Response) {
   const token = readRefreshToken(req);
   if (!token) {
-    res.status(401).json({ success: false, error: "Please log in to continue", code: "SESSION_EXPIRED" });
+    // Signed out is a normal state, not an error: no session to restore.
+    res.json({ success: true, data: null });
     return;
   }
   try {

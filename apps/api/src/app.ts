@@ -79,7 +79,7 @@ export function createApp(): express.Application {
     res.status(healthy ? 200 : 503).json({ success: healthy, status: healthy ? "ok" : "degraded", checks, timestamp: new Date().toISOString() });
   });
 
-  app.use("/api", generalLimit);
+  app.use("/api", ...generalLimit);
   app.use("/api/auth", authRouter);
   app.use("/api/listings", listingsRouter);
   app.use("/api/inquiries", inquiriesRouter);

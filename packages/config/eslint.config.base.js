@@ -5,6 +5,7 @@ import js from "@eslint/js";
 import nextPlugin from "@next/eslint-plugin-next";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
+import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 
 /** @type {import('eslint').Linter.FlatConfig[]} */
@@ -29,6 +30,7 @@ export default [
     plugins: {
       "@typescript-eslint": tsPlugin,
       "@next/next": nextPlugin,
+      "react-hooks": reactHooks,
     },
     rules: {
       ...tsPlugin.configs.recommended.rules,
@@ -42,6 +44,8 @@ export default [
         { prefer: "type-imports" },
       ],
       "no-console": ["warn", { allow: ["warn", "error", "info"] }],
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
     },
   },
   {

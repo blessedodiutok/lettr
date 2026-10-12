@@ -1,69 +1,36 @@
-// File: apps/web/src/stores/authStore.ts
-// Zustand 5 store for authentication state
-// Access token stored in memory only (never localStorage — XSS risk)
-// Refresh token stored in httpOnly cookie (handled by the server)
-
 "use client";
 
-import { create } from "zustand";
+// Session state. The access token lives only in memory; the refresh token is
+// an httpOnly cookie the browser sends to /api/auth automatically.
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  role: "LANDLORD" | "TENANT" | "ADMIN";
-  firstName: string;
-  lastName: string;
-  /** Computed full name — derived from firstName + lastName */
-  name: string;
-  avatarUrl?: string | null;
-  isEmailVerified: boolean;
-}
+import { create } from "zustand";
+import type { Me } from "../lib/types";
+
+export type AuthStatus = "loading" | "authenticated" | "anonymous";
 
 interface AuthState {
-  user: AuthUser | null;
+  status: AuthStatus;
+  user: Me | null;
   accessToken: string | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  setUser: (user: AuthUser) => void;
-  setAccessToken: (token: string) => void;
-  setLoading: (loading: boolean) => void;
-  logout: () => void;
-  hydrate: (user: Omit<AuthUser, "name">, token: string) => void;
-}
-
-/** Normalise a raw API user (no `name`) into an AuthUser (with `name`) */
-function withName(raw: Omit<AuthUser, "name">): AuthUser {
-  return {
-    ...raw,
-    name: `${raw.firstName} ${raw.lastName}`.trim(),
-  };
+  setSession: (user: Me, accessToken: string) => void;
+  setAccessToken: (accessToken: string) => void;
+  setUser: (user: Me) => void;
+  clear: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
+  status: "loading",
   user: null,
   accessToken: null,
-  isLoading: true,
-  isAuthenticated: false,
-
-  setUser: (user) => set({ user, isAuthenticated: true }),
-
-  setAccessToken: (token) => set({ accessToken: token }),
-
-  setLoading: (isLoading) => set({ isLoading }),
-
-  logout: () =>
-    set({
-      user: null,
-      accessToken: null,
-      isAuthenticated: false,
-      isLoading: false,
-    }),
-
-  hydrate: (raw, token) =>
-    set({
-      user: withName(raw),
-      accessToken: token,
-      isAuthenticated: true,
-      isLoading: false,
-    }),
+  setSession: (user, accessToken) => set({ user, accessToken, status: "authenticated" }),
+  setAccessToken: (accessToken) => set({ accessToken }),
+  setUser: (user) => set({ user }),
+  clear: () => set({ user: null, accessToken: null, status: "anonymous" }),
 }));
+
+/** Where each role lands after signing in. */
+export function homeFor(role: Me["role"] | undefined): string {
+  if (role === "LANDLORD") return "/landlord/dashboard";
+  if (role === "ADMIN") return "/admin";
+  return "/dashboard";
+}

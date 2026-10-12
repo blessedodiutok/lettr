@@ -1,174 +1,158 @@
-// File: apps/web/src/hooks/useListings.ts
-// TanStack Query hooks for listing data fetching
-
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "../lib/axios";
-import type { SearchFilters } from "../stores/searchStore";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, errorMessage } from "../lib/api";
+import type { Listing, Paginated, Photo } from "../lib/types";
+import { useAuthStore } from "../stores/authStore";
+import { toast } from "../stores/toastStore";
 
-export interface Listing {
-  id: string;
-  annualRent: number;
-  cautionFee: number;
-  serviceCharge: number;
-  legalFee: number;
-  platformFee: number;
-  agentFeeSaved: number;
-  savings: number;
-  status: string;
-  availableFrom: string;
-  isSaved: boolean;
-  property: {
-    id: string;
-    title: string;
-    description: string;
-    propertyType: string;
-    address: string;
-    neighbourhood: string;
-    lga: string;
-    state: string;
-    latitude: number | null;
-    longitude: number | null;
-    bedrooms: number;
-    bathrooms: number;
-    parkingSpaces: number;
-    isFurnished: boolean;
-    isServiced: boolean;
-    photos: Array<{ url: string; isCover: boolean; altText: string | null }>;
-    amenities: Array<{ type: string }>;
-  };
-  landlord: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    avatarUrl: string | null;
-    landlordProfile: {
-      verificationStatus: string;
-      averageRating: number;
-      totalReviews: number;
-    } | null;
-  };
+export interface ListingFilters {
+  q?: string;
+  state?: string;
+  propertyType?: string;
+  minRent?: string;
+  maxRent?: string;
+  bedrooms?: string;
+  isFurnished?: string;
+  isServiced?: string;
+  sortBy?: string;
+  page?: string;
 }
 
-interface ListingsResponse {
-  listings: Listing[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
+export const FILTER_KEYS: Array<keyof ListingFilters> = ["q", "state", "propertyType", "minRent", "maxRent", "bedrooms", "isFurnished", "isServiced", "sortBy", "page"];
 
-/** Fetch paginated, filtered listings for the browse page */
-export function useListings(filters: Partial<SearchFilters>, page = 1) {
+export function toQueryString(filters: ListingFilters, extra: Record<string, string> = {}) {
   const params = new URLSearchParams();
-  if (filters.state) params.set("state", filters.state);
-  if (filters.lga) params.set("lga", filters.lga);
-  if (filters.neighbourhood) params.set("neighbourhood", filters.neighbourhood);
-  if (filters.propertyType) params.set("propertyType", filters.propertyType);
-  if (filters.minRent) params.set("minRent", filters.minRent);
-  if (filters.maxRent) params.set("maxRent", filters.maxRent);
-  if (filters.bedrooms) params.set("bedrooms", filters.bedrooms);
-  if (filters.isFurnished !== null && filters.isFurnished !== undefined) {
-    params.set("isFurnished", String(filters.isFurnished));
+  for (const key of FILTER_KEYS) {
+    const value = filters[key];
+    if (value) params.set(key, value);
   }
-  if (filters.sortBy) params.set("sortBy", filters.sortBy);
-  params.set("page", String(page));
-  params.set("limit", "20");
+  for (const [key, value] of Object.entries(extra)) params.set(key, value);
+  return params.toString();
+}
 
-  return useQuery<ListingsResponse>({
-    queryKey: ["listings", filters, page],
-    queryFn: async () => {
-      const { data } = await apiClient.get<{ data: ListingsResponse }>(
-        `/api/listings?${params.toString()}`,
-      );
-      return data.data;
-    },
-    staleTime: 2 * 60 * 1000, // 2 minutes
+export function useListingSearch(filters: ListingFilters, limit = 18) {
+  const ready = useAuthStore((s) => s.status !== "loading");
+  return useQuery({
+    queryKey: ["listings", filters, limit],
+    queryFn: () => api<Paginated<Listing> & { listings: Listing[] }>("get", `/api/listings?${toQueryString(filters, { limit: String(limit) })}`),
+    placeholderData: keepPreviousData,
+    // Wait for the session so saved hearts are correct on first paint.
+    enabled: ready,
   });
 }
 
-/** Fetch a single listing by ID */
-export function useListing(id: string) {
-  return useQuery<Listing>({
+export function useListing(id: string, initialData?: Listing) {
+  const status = useAuthStore((s) => s.status);
+  return useQuery({
     queryKey: ["listing", id],
-    queryFn: async () => {
-      const { data } = await apiClient.get<{ data: Listing }>(
-        `/api/listings/${id}`,
-      );
-      return data.data;
-    },
-    enabled: !!id,
+    queryFn: () => api<Listing>("get", `/api/listings/${id}`),
+    initialData,
+    // Server-rendered data has no session (saved state), so refetch once signed in.
+    initialDataUpdatedAt: 0,
+    enabled: Boolean(id) && status !== "loading",
   });
 }
 
-/** Fetch landlord's own listings */
-export function useMyListings() {
-  return useQuery<Listing[]>({
-    queryKey: ["my-listings"],
-    queryFn: async () => {
-      const { data } = await apiClient.get<{ data: Listing[] }>(
-        "/api/listings/landlord/mine",
-      );
-      return data.data;
-    },
-  });
-}
-
-/** Fetch saved listings for the current tenant */
 export function useSavedListings() {
-  return useQuery<Array<{ listing: Listing }>>({
+  return useQuery({
     queryKey: ["saved-listings"],
-    queryFn: async () => {
-      const { data } = await apiClient.get<{
-        data: Array<{ listing: Listing }>;
-      }>("/api/listings/tenant/saved");
-      return data.data;
-    },
+    queryFn: () => api<Array<{ savedAt: string; listing: Listing }>>("get", "/api/listings/tenant/saved"),
   });
 }
 
-/** Save or unsave a listing */
 export function useToggleSave() {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async ({
-      listingId,
-      isSaved,
-    }: {
-      listingId: string;
-      isSaved: boolean;
-    }) => {
-      if (isSaved) {
-        await apiClient.delete(`/api/listings/${listingId}/save`);
-      } else {
-        await apiClient.post(`/api/listings/${listingId}/save`);
-      }
-    },
-    onSuccess: () => {
+    mutationFn: ({ listingId, saved }: { listingId: string; saved: boolean }) =>
+      api(saved ? "delete" : "post", `/api/listings/${listingId}/save`),
+    onSuccess: (_data, { saved }) => {
+      toast.success(saved ? "Removed from saved homes" : "Saved — find it under Saved homes");
       queryClient.invalidateQueries({ queryKey: ["listings"] });
+      queryClient.invalidateQueries({ queryKey: ["listing"] });
       queryClient.invalidateQueries({ queryKey: ["saved-listings"] });
     },
+    onError: (error) => toast.error(errorMessage(error)),
   });
 }
 
-/** Fetch map-optimised listing pins */
-export function useMapListings(filters: Partial<SearchFilters>) {
-  const params = new URLSearchParams();
-  if (filters.state) params.set("state", filters.state);
-  if (filters.lga) params.set("lga", filters.lga);
+// ── Landlord ───────────────────────────────────────────────────────────────
 
-  return useQuery({
-    queryKey: ["map-listings", filters],
-    queryFn: async () => {
-      const { data } = await apiClient.get(
-        `/api/listings/map?${params.toString()}`,
-      );
-      return data.data;
+export function useMyListings() {
+  return useQuery({ queryKey: ["my-listings"], queryFn: () => api<Listing[]>("get", "/api/listings/landlord/mine") });
+}
+
+export function useMyListing(id: string) {
+  return useQuery({ queryKey: ["my-listing", id], queryFn: () => api<Listing>("get", `/api/listings/landlord/mine/${id}`), enabled: Boolean(id) });
+}
+
+function useInvalidateMine() {
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ["my-listings"] });
+    queryClient.invalidateQueries({ queryKey: ["my-listing"] });
+    queryClient.invalidateQueries({ queryKey: ["listing"] });
+  };
+}
+
+export function useCreateListing() {
+  const invalidate = useInvalidateMine();
+  return useMutation({
+    mutationFn: (body: unknown) => api<Listing>("post", "/api/listings", body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateListing(id: string) {
+  const invalidate = useInvalidateMine();
+  return useMutation({
+    mutationFn: (body: unknown) => api<Listing>("put", `/api/listings/${id}`, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useListingStatusAction() {
+  const invalidate = useInvalidateMine();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string; action: "publish" | "archive" | "delete" }) =>
+      action === "delete" ? api("delete", `/api/listings/${id}`) : api<Listing>("patch", `/api/listings/${id}/${action}`),
+    onSuccess: (_data, { action }) => {
+      toast.success({ publish: "Your listing is live", archive: "Listing taken off the market", delete: "Draft deleted" }[action]);
+      invalidate();
     },
-    staleTime: 5 * 60 * 1000,
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+}
+
+export function useUploadPhotos(propertyId: string) {
+  const invalidate = useInvalidateMine();
+  return useMutation({
+    mutationFn: async ({ files, onProgress }: { files: File[]; onProgress?: (percent: number) => void }) => {
+      const form = new FormData();
+      files.forEach((file) => form.append("photos", file));
+      return api<Photo[]>("post", `/api/uploads/photos/${propertyId}`, form, {
+        onUploadProgress: (event) => event.total && onProgress?.(Math.round((event.loaded / event.total) * 100)),
+        timeout: 120_000,
+      });
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useReorderPhotos(propertyId: string) {
+  const invalidate = useInvalidateMine();
+  return useMutation({
+    mutationFn: (photoIds: string[]) => api<Photo[]>("put", `/api/uploads/photos/${propertyId}/order`, { photoIds }),
+    onSuccess: invalidate,
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+}
+
+export function useDeletePhoto() {
+  const invalidate = useInvalidateMine();
+  return useMutation({
+    mutationFn: (photoId: string) => api<Photo[]>("delete", `/api/uploads/photos/item/${photoId}`),
+    onSuccess: invalidate,
+    onError: (error) => toast.error(errorMessage(error)),
   });
 }

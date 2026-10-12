@@ -1,5 +1,6 @@
 // Profiles, avatars, bank accounts and public landlord pages.
 
+import { calculateMoveInCost } from "@lettr/utils";
 import type { Prisma, UserRole } from "@prisma/client";
 import { listBanks, resolveAccount } from "../lib/paystack.js";
 import { prisma } from "../lib/prisma.js";
@@ -124,5 +125,17 @@ export async function getPublicLandlord(landlordId: string) {
     },
   });
   if (!landlord) throw createError("Landlord not found.", 404);
-  return landlord;
+  return {
+    ...landlord,
+    listings: landlord.listings.map((listing) => ({
+      ...listing,
+      property: { ...listing.property, address: "" },
+      moveInCost: calculateMoveInCost({
+        annualRent: listing.annualRent.toNumber(),
+        cautionFee: listing.cautionFee.toNumber(),
+        serviceCharge: listing.serviceCharge.toNumber(),
+        legalFee: listing.legalFee.toNumber(),
+      }),
+    })),
+  };
 }

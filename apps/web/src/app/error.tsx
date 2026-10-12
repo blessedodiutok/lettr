@@ -1,34 +1,19 @@
-// File: apps/web/src/app/error.tsx
 "use client";
 
 import { useEffect } from "react";
 import { Button } from "../components/ui/button";
 
-export default function GlobalError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error);
   }, [error]);
-
   return (
-    <div className="min-h-screen bg-[var(--color-neutral-50)] flex items-center justify-center px-4">
-      <div className="text-center max-w-md">
-        <p className="text-6xl mb-4">⚠️</p>
-        <h1 className="text-2xl font-bold text-[var(--color-neutral-800)] mb-2">
-          Something went wrong
-        </h1>
-        <p className="text-[var(--color-neutral-500)] mb-8">
-          An unexpected error occurred. Please try again.
-        </p>
-        <Button variant="primary" onClick={reset}>
-          Try again
-        </Button>
-      </div>
-    </div>
+    <main id="main" className="flex min-h-[70svh] flex-col items-center justify-center px-6 text-center">
+      <h1 className="font-display text-3xl font-medium text-ink">Something went wrong on this page</h1>
+      <p className="mt-2 max-w-md text-muted">Try again. If it keeps happening, contact us{error.digest ? ` and quote reference ${error.digest}` : ""}.</p>
+      <Button className="mt-6" onClick={reset}>
+        Try again
+      </Button>
+    </main>
   );
 }

@@ -1,468 +1,218 @@
-/* File: apps/web/src/app/globals.css */
-/* Tailwind v4 CSS-native configuration — Lettr design tokens + shadcn/ui bridge */
+/* LETTR design system — tokens, Tailwind v4 theme mapping and base styles.
+   Colour roles: navy = actions and links; brass = one conversion moment per
+   screen (always with dark text); neutrals carry everything else. */
 
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is([data-theme="dark"] *));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   LETTR BRAND TOKENS
-   Source of truth for all colours, spacing, radii, shadows, and transitions.
-   ───────────────────────────────────────────────────────────────────────────── */
 :root {
-  /* Primary — deep navy blue (trust, professionalism) */
-  --color-primary-50: #eef3f8;
-  --color-primary-100: #d4e1ee;
-  --color-primary-200: #a9c3dd;
-  --color-primary-300: #7ea5cc;
-  --color-primary-400: #5387bb;
-  --color-primary-500: #2b6aa3;
-  --color-primary-600: #1a3c5e; /* ← Main brand navy */
-  --color-primary-700: #153049;
-  --color-primary-800: #102436;
-  --color-primary-900: #0a1822;
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --surface-2: #edf1f5;
+  --line: #dae2ea;
+  --line-strong: #c3cfdb;
+  --ink: #0f1c2b;
+  --ink-2: #34465a;
+  --muted: #5b6b7d;
 
-  /* Accent — warm gold (premium, Nigerian richness) */
-  --color-accent-50: #fef9ec;
-  --color-accent-100: #fcf0c9;
-  --color-accent-200: #f9e194;
-  --color-accent-300: #f6d25f;
-  --color-accent-400: #f3c22a;
-  --color-accent-500: #d4a017; /* ← Main gold accent */
-  --color-accent-600: #a87c12;
-  --color-accent-700: #7c590d;
-  --color-accent-800: #503808;
-  --color-accent-900: #241903;
+  --navy: #1a3c5e;
+  --navy-hover: #153049;
+  --navy-deep: #0f2740;
+  --navy-soft: #e5edf5;
+  --on-navy: #ffffff;
 
-  /* Semantic */
-  --color-success-50: #ecfdf5;
-  --color-success-100: #d1fae5;
-  --color-success-500: #10b981;
-  --color-success-600: #059669;
-  --color-success-700: #047857;
+  --brass: #b8862a;
+  --brass-hover: #a5771f;
+  --brass-soft: #f5ecd9;
+  --on-brass: #1b1406;
 
-  --color-warning-50: #fffbeb;
-  --color-warning-100: #fef3c7;
-  --color-warning-500: #f59e0b;
-  --color-warning-600: #d97706;
+  --ok: #1d774a;
+  --ok-soft: #e1f2e8;
+  --warn: #8e5508;
+  --warn-soft: #faeeda;
+  --bad: #b42318;
+  --bad-soft: #fbe6e3;
+  --info: #1f5fa8;
+  --info-soft: #e3edf9;
 
-  --color-danger-50: #fef2f2;
-  --color-danger-100: #fee2e2;
-  --color-danger-500: #ef4444;
-  --color-danger-600: #dc2626;
+  --hero-ink: #ffffff;
+  --hero-muted: #b9cadb;
+  --hero-accent: #e0be78;
 
-  /* Neutrals — warm off-white base, not pure cool grey */
-  --color-neutral-50: #fafaf7;
-  --color-neutral-100: #f1f5f9;
-  --color-neutral-200: #e2e8f0;
-  --color-neutral-300: #cbd5e1;
-  --color-neutral-400: #94a3b8;
-  --color-neutral-500: #64748b;
-  --color-neutral-600: #475569;
-  --color-neutral-700: #374151;
-  --color-neutral-800: #1e293b;
-  --color-neutral-900: #0f172a;
+  --elev-1: 0 1px 2px rgb(15 28 43 / 0.06), 0 1px 1px rgb(15 28 43 / 0.04);
+  --elev-2: 0 12px 32px -12px rgb(15 28 43 / 0.25);
+  --elev-3: 0 24px 60px -20px rgb(15 28 43 / 0.4);
 
-  /* Typography */
-  --font-display: "Playfair Display", Georgia, serif;
-  --font-body: "DM Sans", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Courier New", monospace;
+  --ff-display: var(--font-newsreader), Georgia, "Times New Roman", serif;
+  --ff-body: var(--font-dm-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  /* Spacing scale */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-2xl: 48px;
-  --spacing-3xl: 64px;
-  --spacing-4xl: 96px;
-
-  /* Border radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 24px;
-  --radius-full: 9999px;
-
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg:
-    0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl:
-    0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-card: 0 2px 8px 0 rgb(26 60 94 / 0.08);
-  --shadow-card-hover: 0 8px 24px 0 rgb(26 60 94 / 0.14);
-
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-base: 200ms ease;
-  --transition-slow: 300ms ease;
-
-  /* Z-index scale */
-  --z-base: 0;
-  --z-raised: 10;
-  --z-dropdown: 100;
-  --z-sticky: 200;
-  --z-overlay: 300;
-  --z-modal: 400;
-  --z-toast: 500;
-
-  /* ───────────────────────────────────────────────────────────────────────────
-     SHADCN/UI VARIABLE BRIDGE  (light mode)
-     Maps Lettr tokens → the exact CSS variable names shadcn components expect.
-     This is what makes every shadcn component automatically use Lettr's brand.
-     ─────────────────────────────────────────────────────────────────────────── */
-  --background: var(--color-neutral-50);
-  --foreground: var(--color-neutral-900);
-
-  --card: #ffffff;
-  --card-foreground: var(--color-neutral-900);
-
-  --popover: #ffffff;
-  --popover-foreground: var(--color-neutral-900);
-
-  --primary: var(--color-primary-600);
-  --primary-foreground: #ffffff;
-
-  --secondary: var(--color-neutral-100);
-  --secondary-foreground: var(--color-neutral-800);
-
-  --muted: var(--color-neutral-100);
-  --muted-foreground: var(--color-neutral-500);
-
-  --accent: var(--color-accent-500);
-  --accent-foreground: #ffffff;
-
-  --destructive: var(--color-danger-500);
-  --destructive-foreground: #ffffff;
-
-  --border: var(--color-neutral-200);
-  --input: var(--color-neutral-200);
-  --ring: var(--color-primary-500);
-
-  /* shadcn radius token — maps to our md radius */
-  --radius: var(--radius-md);
-
-  /* Chart colours (for future dashboard charts) */
-  --chart-1: var(--color-primary-600);
-  --chart-2: var(--color-accent-500);
-  --chart-3: var(--color-success-500);
-  --chart-4: var(--color-warning-500);
-  --chart-5: var(--color-danger-500);
-
-  /* Sidebar — shadcn expects --sidebar (not --sidebar-background) */
-  --sidebar: var(--color-primary-900);
-  --sidebar-foreground: var(--color-neutral-100);
-  --sidebar-primary: var(--color-accent-500);
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--color-primary-700);
-  --sidebar-accent-foreground: var(--color-neutral-100);
-  --sidebar-border: var(--color-primary-800);
-  --sidebar-ring: var(--color-primary-400);
+  color-scheme: light;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   DARK MODE  (next-themes sets data-theme="dark" on <html>)
-   ───────────────────────────────────────────────────────────────────────────── */
 [data-theme="dark"] {
-  /* Lettr neutrals flip */
-  --color-neutral-50: #0f172a;
-  --color-neutral-100: #1e293b;
-  --color-neutral-200: #334155;
-  --color-neutral-300: #475569;
-  --color-neutral-700: #cbd5e1;
-  --color-neutral-800: #e2e8f0;
-  --color-neutral-900: #f8fafc;
+  --bg: #09141f;
+  --surface: #0f1d2b;
+  --surface-2: #142638;
+  --line: #21364a;
+  --line-strong: #2e4a63;
+  --ink: #e6edf4;
+  --ink-2: #c0cdda;
+  --muted: #92a3b5;
 
-  /* shadcn bridge — dark overrides */
-  --background: #0f172a;
-  --foreground: #f8fafc;
+  --navy: #8db8e3;
+  --navy-hover: #a7c9ec;
+  --navy-deep: #0b1d2e;
+  --navy-soft: #152f48;
+  --on-navy: #08131d;
 
-  --card: #1e293b;
-  --card-foreground: #f8fafc;
+  --brass: #d8ae58;
+  --brass-hover: #e3bd6e;
+  --brass-soft: #2d2313;
+  --on-brass: #1b1406;
 
-  --popover: #1e293b;
-  --popover-foreground: #f8fafc;
+  --ok: #5bc48f;
+  --ok-soft: #11301f;
+  --warn: #e3a64c;
+  --warn-soft: #33240e;
+  --bad: #f27b6f;
+  --bad-soft: #3a1714;
+  --info: #82b4ef;
+  --info-soft: #12273f;
 
-  --primary: var(--color-primary-400);
-  --primary-foreground: #0f172a;
+  --hero-muted: #9fb4c9;
 
-  --secondary: #1e293b;
-  --secondary-foreground: #e2e8f0;
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --elev-2: 0 12px 32px -12px rgb(0 0 0 / 0.6);
+  --elev-3: 0 24px 60px -20px rgb(0 0 0 / 0.7);
 
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-
-  --accent: var(--color-accent-400);
-  --accent-foreground: #0f172a;
-
-  --destructive: var(--color-danger-600);
-  --destructive-foreground: #ffffff;
-
-  --border: #334155;
-  --input: #334155;
-  --ring: var(--color-primary-400);
-
-  --sidebar: #020817;
-  --sidebar-foreground: var(--color-neutral-100);
-  --sidebar-primary: var(--color-accent-400);
-  --sidebar-primary-foreground: #0f172a;
-  --sidebar-accent: var(--color-primary-800);
-  --sidebar-accent-foreground: var(--color-neutral-100);
-  --sidebar-border: var(--color-primary-900);
-  --sidebar-ring: var(--color-primary-400);
+  color-scheme: dark;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   TAILWIND v4 THEME MAPPING  (inline — required for shadcn/ui compatibility)
-   Exposes tokens as Tailwind utility classes: bg-brand-navy, text-brand-gold, etc.
-   ───────────────────────────────────────────────────────────────────────────── */
 @theme inline {
-  /* Brand shortcuts */
-  --color-brand-navy: var(--color-primary-600);
-  --color-brand-gold: var(--color-accent-500);
-
-  /* Semantic surface aliases — use these in components */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
   --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
+  --color-navy: var(--navy);
+  --color-navy-hover: var(--navy-hover);
+  --color-navy-deep: var(--navy-deep);
+  --color-navy-soft: var(--navy-soft);
+  --color-on-navy: var(--on-navy);
+  --color-brass: var(--brass);
+  --color-brass-hover: var(--brass-hover);
+  --color-brass-soft: var(--brass-soft);
+  --color-on-brass: var(--on-brass);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-hero-ink: var(--hero-ink);
+  --color-hero-muted: var(--hero-muted);
+  --color-hero-accent: var(--hero-accent);
 
-  /* Chart colours */
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
+  --font-display: var(--ff-display);
+  --font-sans: var(--ff-body);
 
-  /* Sidebar */
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+  --shadow-1: var(--elev-1);
+  --shadow-2: var(--elev-2);
+  --shadow-3: var(--elev-3);
 
-  /* Semantic colours exposed as utilities */
-  --color-success: var(--color-success-500);
-  --color-warning: var(--color-warning-500);
-  --color-danger: var(--color-danger-500);
-
-  /* Font families */
-  --font-family-display: var(--font-display);
-  --font-family-body: var(--font-body);
-  --font-family-sans: var(--font-body); /* shadcn expects --font-sans */
-  --font-family-mono: var(--font-mono);
-
-  /* Border radius utilities */
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-full: 9999px;
-
-  /* Shadow utilities */
-  --shadow-card: var(--shadow-card);
-  --shadow-card-hover: var(--shadow-card-hover);
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-media: 16px;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   BASE STYLES
-   ───────────────────────────────────────────────────────────────────────────── */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  border-color: var(--border); /* shadcn default border colour */
-}
-
-html {
-  font-family: var(--font-body);
-  background-color: var(--background);
-  color: var(--foreground);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  scroll-behavior: smooth;
-  text-size-adjust: 100%;
-}
-
-body {
-  min-height: 100svh; /* svh = small viewport height, better on mobile */
-  line-height: 1.6;
-  background-color: var(--background);
-  color: var(--foreground);
-}
-
-/* Focus ring — accessible, on-brand */
-:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-/* Remove focus ring for mouse users */
-:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* Smooth scrolling — but respect reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
+@layer base {
   *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+  ::before,
+  ::after {
+    border-color: var(--line);
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-size-adjust: 100%;
+  }
+  body {
+    min-height: 100svh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--ff-body);
+    line-height: 1.55;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 2px solid var(--navy);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--navy-soft);
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   TYPOGRAPHY UTILITIES
-   ───────────────────────────────────────────────────────────────────────────── */
-
-/* Price display — Playfair Display, always */
-.price {
-  font-family: var(--font-display);
-  font-weight: 700;
-  color: var(--color-primary-600);
-  letter-spacing: -0.01em;
+@layer components {
+  .page {
+    width: 100%;
+    max-width: 80rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+  @media (min-width: 768px) {
+    .page {
+      padding-inline: 2rem;
+    }
+  }
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 50%, var(--surface-2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 8px;
+  }
 }
 
-/* Display headings */
-.heading-display {
-  font-family: var(--font-display);
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  color: var(--foreground);
-}
-
-/* Section labels — small, spaced, muted */
-.label-section {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   SKELETON / SHIMMER  — loading states
-   ───────────────────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0% {
-    background-position: -200% 0;
-  }
-  100% {
     background-position: 200% 0;
   }
-}
-
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--color-neutral-200) 25%,
-    var(--color-neutral-100) 50%,
-    var(--color-neutral-200) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: var(--radius-md);
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   SCROLLBAR  — subtle, on-brand (WebKit only)
-   ───────────────────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-neutral-300);
-  border-radius: var(--radius-full);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-neutral-400);
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   ACCESSIBILITY
-   ───────────────────────────────────────────────────────────────────────────── */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   COMPONENT LAYER — global patterns used across many components
-   ───────────────────────────────────────────────────────────────────────────── */
-@layer components {
-  /* Card base — consistent elevation across the product */
-  .card-base {
-    background-color: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    transition:
-      box-shadow var(--transition-base),
-      transform var(--transition-base);
-  }
-
-  .card-base:hover {
-    box-shadow: var(--shadow-card-hover);
-    transform: translateY(-1px);
-  }
-
-  /* Interactive surface — buttons, clickable cards */
-  .surface-interactive {
-    cursor: pointer;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  /* Page container */
-  .page-container {
-    max-width: 80rem; /* 1280px */
-    margin-inline: auto;
-    padding-inline: clamp(1rem, 4vw, 2rem);
-  }
-
-  /* Section spacing */
-  .section-gap {
-    padding-block: clamp(3rem, 6vw, 5rem);
+  100% {
+    background-position: -200% 0;
   }
 }

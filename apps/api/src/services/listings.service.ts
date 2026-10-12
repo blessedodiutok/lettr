@@ -31,18 +31,33 @@ function enrich<T extends ListingRecord>(listing: T, savedIds?: Set<string>) {
   return { ...listing, moveInCost: costOf(listing), isSaved: savedIds?.has(listing.id) ?? false };
 }
 
+/**
+ * The street address and exact pin are private until a tenant has paid; the
+ * tenancy agreement shows them then. Everyone else sees neighbourhood and area.
+ */
+function forPublic<T extends { property: { address: string; latitude: number | null; longitude: number | null } }>(listing: T): T {
+  const round = (value: number | null) => (value === null ? null : Math.round(value * 100) / 100);
+  return {
+    ...listing,
+    property: { ...listing.property, address: "", latitude: round(listing.property.latitude), longitude: round(listing.property.longitude) },
+  };
+}
+
 export async function searchListings(query: SearchQuery, userId?: string) {
   const skip = (query.page - 1) * query.limit;
   const { listings, total } = await listingsRepo.searchListings(query, skip, query.limit, query.sortBy);
   const savedIds = userId ? await listingsRepo.getSavedListingIds(userId, listings.map((l) => l.id)) : undefined;
   return {
-    listings: listings.map((listing) => enrich(listing, savedIds)),
+    listings: listings.map((listing) => forPublic(enrich(listing, savedIds))),
     pagination: { page: query.page, limit: query.limit, total, totalPages: Math.max(1, Math.ceil(total / query.limit)) },
   };
 }
 
 export async function getMapListings(query: SearchFilters) {
-  return listingsRepo.getMapListings(query);
+  // Pins show the area, not the exact building.
+  const pins = await listingsRepo.getMapListings(query);
+  const round = (value: number | null) => (value === null ? null : Math.round(value * 100) / 100);
+  return pins.map((pin) => ({ ...pin, property: { ...pin.property, latitude: round(pin.property.latitude), longitude: round(pin.property.longitude) } }));
 }
 
 /**
@@ -64,7 +79,8 @@ export async function getListing(id: string, userId?: string, role?: UserRole) {
     listingsRepo.incrementViewCount(id).catch(() => undefined);
   }
   const savedIds = userId ? await listingsRepo.getSavedListingIds(userId, [id]) : undefined;
-  return enrich(listing, savedIds);
+  const enriched = enrich(listing, savedIds);
+  return listing.landlordId === userId || role === "ADMIN" ? enriched : forPublic(enriched);
 }
 
 async function ownedListing(id: string, landlordId: string) {
@@ -174,7 +190,7 @@ export async function unsaveListing(listingId: string, userId: string) {
 
 export async function getSavedListings(userId: string) {
   const saved = await listingsRepo.getSavedListings(userId);
-  return saved.map((entry) => ({ savedAt: entry.createdAt, listing: { ...enrich(entry.listing), isSaved: true } }));
+  return saved.map((entry) => ({ savedAt: entry.createdAt, listing: forPublic({ ...enrich(entry.listing), isSaved: true }) }));
 }
 
 export async function getMyListings(landlordId: string) {

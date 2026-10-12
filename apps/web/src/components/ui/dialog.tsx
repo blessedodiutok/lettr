@@ -1,164 +1,94 @@
-// File: apps/web/src/components/ui/dialog.tsx
-// Accessible modal dialog — focus trap, backdrop, keyboard dismiss
-
 "use client";
 
 import { X } from "lucide-react";
+import { Dialog as RadixDialog } from "radix-ui";
 import * as React from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/cn";
 
 interface DialogProps {
   open: boolean;
-  onClose: () => void;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
-  className?: string;
-  maxWidth?: "sm" | "md" | "lg" | "xl";
+  footer?: React.ReactNode;
+  size?: "sm" | "md" | "lg";
 }
 
-const maxWidthMap = {
-  sm: "max-w-sm",
-  md: "max-w-md",
-  lg: "max-w-lg",
-  xl: "max-w-xl",
-};
-
-export function Dialog({
-  open,
-  onClose,
-  children,
-  className,
-  maxWidth = "md",
-}: DialogProps) {
-  // Close on Escape
-  React.useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  // Prevent body scroll when open
-  React.useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  if (!open) return null;
-
+/** Modal dialog. On phones it rises from the bottom as a sheet. */
+export function Dialog({ open, onOpenChange, title, description, children, footer, size = "md" }: DialogProps) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-(--z-modal) flex items-center justify-center p-4"
-    >
-      {/* Backdrop */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Panel */}
-      <div
-        className={cn(
-          "relative z-10 w-full",
-          maxWidthMap[maxWidth],
-          "bg-card text-card-foreground",
-          "rounded-2xlvar(--border)]",
-          "shadow-(--shadow-xl)",
-          "animate-in fade-in-0 zoom-in-95 duration-200",
-          className,
-        )}
-      >
-        {children}
-      </div>
-    </div>
+    <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
+      <RadixDialog.Portal>
+        <RadixDialog.Overlay className="fixed inset-0 z-50 bg-navy-deep/50 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <RadixDialog.Content
+          className={cn(
+            "fixed z-50 flex max-h-[92svh] w-full flex-col bg-surface shadow-3 outline-none",
+            "inset-x-0 bottom-0 rounded-t-[20px] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-media",
+            "data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom-8 sm:data-[state=open]:slide-in-from-bottom-2 sm:data-[state=open]:fade-in-0",
+            { sm: "sm:max-w-md", md: "sm:max-w-lg", lg: "sm:max-w-2xl" }[size],
+          )}
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-line px-5 pb-4 pt-5">
+            <div className="min-w-0">
+              <RadixDialog.Title className="font-display text-xl font-medium text-ink">{title}</RadixDialog.Title>
+              {description ? (
+                <RadixDialog.Description className="mt-1 text-sm text-muted">{description}</RadixDialog.Description>
+              ) : (
+                <RadixDialog.Description className="sr-only">{title}</RadixDialog.Description>
+              )}
+            </div>
+            <RadixDialog.Close className="-mr-1 rounded-control p-1.5 text-muted hover:bg-surface-2 hover:text-ink" aria-label="Close">
+              <X className="size-5" />
+            </RadixDialog.Close>
+          </div>
+          <div className="overflow-y-auto px-5 py-5">{children}</div>
+          {footer && <div className="flex flex-col-reverse gap-2 border-t border-line px-5 py-4 sm:flex-row sm:justify-end">{footer}</div>}
+        </RadixDialog.Content>
+      </RadixDialog.Portal>
+    </RadixDialog.Root>
   );
 }
 
-export function DialogHeader({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+interface ConfirmProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: React.ReactNode;
+  confirmLabel: string;
+  tone?: "primary" | "danger";
+  isLoading?: boolean;
+  onConfirm: () => void;
+}
+
+/** A yes/no dialog for actions that are hard to undo. */
+export function ConfirmDialog({ open, onOpenChange, title, description, confirmLabel, tone = "primary", isLoading, onConfirm }: ConfirmProps) {
   return (
-    <div
-      className={cn(
-        "flex items-start justify-between gap-4",
-        "px-6 pt-6 pb-4 border-b border-border",
-        className,
-      )}
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      size="sm"
+      footer={
+        <>
+          <button type="button" onClick={() => onOpenChange(false)} className="h-10 rounded-control border border-line-strong px-4 text-sm font-semibold text-ink hover:bg-surface-2">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isLoading}
+            className={cn(
+              "h-10 rounded-control px-4 text-sm font-semibold disabled:opacity-60",
+              tone === "danger" ? "bg-bad text-white" : "bg-navy text-on-navy hover:bg-navy-hover",
+            )}
+          >
+            {isLoading ? "Working…" : confirmLabel}
+          </button>
+        </>
+      }
     >
-      <div className="flex-1 min-w-0">{children}</div>
-    </div>
-  );
-}
-
-export function DialogTitle({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <h2 className={cn("heading-display text-xl text-foreground", className)}>
-      {children}
-    </h2>
-  );
-}
-
-export function DialogClose({ onClose }: { onClose: () => void }) {
-  return (
-    <button
-      onClick={onClose}
-      aria-label="Close dialog"
-      className="
-        absolute top-4 right-4
-        p-1.5 rounded-(--radius-md)
-        text-muted-foreground
-        hover:bg-muted hover:text-foreground
-        transition-colors duration-150
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
-      "
-    >
-      <X size={16} aria-hidden="true" />
-    </button>
-  );
-}
-
-export function DialogBody({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return <div className={cn("px-6 py-5", className)}>{children}</div>;
-}
-
-export function DialogFooter({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-end gap-3",
-        "px-6 pb-6 pt-4 border-t border-border",
-        className,
-      )}
-    >
-      {children}
-    </div>
+      <div className="text-[15px] leading-relaxed text-ink-2">{description}</div>
+    </Dialog>
   );
 }

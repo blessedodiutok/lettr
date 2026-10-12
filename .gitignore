@@ -59,3 +59,6 @@ web-build/
 *.pem
 .cache/
 tmp/
+# Playwright
+test-results/
+playwright-report/

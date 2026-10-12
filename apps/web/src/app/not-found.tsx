@@ -1,29 +1,22 @@
-// File: apps/web/src/app/not-found.tsx
 import Link from "next/link";
+import { Logo } from "../components/layout/brand";
+import { Button } from "../components/ui/button";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-[var(--color-neutral-50)] flex items-center justify-center px-4">
-      <div className="text-center max-w-md">
-        <p
-          className="text-8xl font-bold text-[var(--color-primary-100)] mb-4"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          404
-        </p>
-        <h1 className="text-2xl font-bold text-[var(--color-primary-600)] mb-2">
-          Page not found
-        </h1>
-        <p className="text-[var(--color-neutral-500)] mb-8">
-          The page you're looking for doesn't exist or may have moved.
-        </p>
-        <Link
-          href="/"
-          className="inline-flex items-center justify-center h-11 px-6 bg-[var(--color-primary-600)] text-white font-semibold rounded-lg hover:bg-[var(--color-primary-700)] transition-colors"
-        >
-          Go home
-        </Link>
+    <main id="main" className="flex min-h-svh flex-col items-center justify-center px-6 text-center">
+      <Logo />
+      <p className="mt-10 font-display text-7xl text-line-strong">404</p>
+      <h1 className="mt-2 font-display text-3xl font-medium text-ink">We couldn&apos;t find that page</h1>
+      <p className="mt-2 max-w-md text-muted">It may have moved, or the home may no longer be listed.</p>
+      <div className="mt-8 flex gap-3">
+        <Button asChild>
+          <Link href="/listings">Browse homes</Link>
+        </Button>
+        <Button asChild variant="secondary">
+          <Link href="/">Go home</Link>
+        </Button>
       </div>
-    </div>
+    </main>
   );
 }
