@@ -85,7 +85,7 @@ Building the `vercel-portfolio` branch exposed three bugs that also exist at thi
 
 | Bug | Effect | Fix |
 | --- | --- | --- |
-| The API's money serializer never ran | Money reached clients as strings. The tenant's "saved" total on Payments is wrong with two or more payments | Commit `7614b48`, which can be cherry-picked as it is |
+| The API's money serializer never ran | Money reached clients as strings. The tenant's "saved" total on Payments is wrong with two or more payments | Commit `205a325`, which can be cherry-picked as it is |
 | The seed's delete order fails once a dispute exists | `pnpm db:seed` crashes on a database that has been used | `TRUNCATE` in `apps/api/src/demo/sampleData.ts` |
 | `pnpm db:seed` gives no warning that it deletes everything | Accounts you created yourself are lost | Warnings in the README |
 

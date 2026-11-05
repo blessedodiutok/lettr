@@ -21,6 +21,8 @@ You'll work in two places:
 
 **Do:** change the branch name from `main` to `vercel-portfolio`, then click **Save**.
 
+If Vercel answers **No deployments found for 'vercel-portfolio'. Deploy the branch, then retry**, it has never built that branch. Do steps 2 to 4, then get a first build of the branch: push a commit to it, or use a Deploy Hook (**Settings → Git → Deploy Hooks**, with the branch `vercel-portfolio`). Once the branch appears under **Deployments**, save this setting again.
+
 **What it does:** new production deployments are built from `vercel-portfolio`. The live site doesn't change yet.
 
 **Check:** reload the page. Branch Tracking still shows `vercel-portfolio`.
@@ -45,7 +47,7 @@ You'll work in two places:
 
 1. Open the **Storage** tab of the project and click **Create Database**.
 2. Choose **Neon**, the free plan and the region **US East (N. Virginia)**, then finish creating it.
-3. Connect it to this project with **Production** ticked.
+3. Connect it to this project with **Production** and **Preview** ticked.
 
 **What it does:** creates the free database and gives the project its connection details.
 
@@ -70,7 +72,7 @@ node scripts/vercel-env.mjs
 1. Select the four lines in the terminal and copy them. Keep them private: don't commit them or send them to anyone.
 2. Go to **Settings → Environment Variables** and click **Add**.
 3. Paste all four lines into the **Key** box. Vercel splits them into four entries.
-4. Select **Production** as the environment and click **Save**.
+4. Select **Production** and **Preview** as the environments and click **Save**. A branch's first build runs as a Preview, so it needs them too.
 
 **Check:** all four names are listed under Environment Variables.
 
@@ -102,7 +104,7 @@ Finally, on the Vercel website, **Settings → Cron Jobs** should list `/api/dem
 ### Good to know
 
 - **Future updates:** anything pushed to `vercel-portfolio` now deploys to production automatically.
-- **Other branches:** pushes to `main` or `phase-2` create Preview deployments, which don't touch the live site. They may show as failed because the settings above apply to Production only. That's harmless.
+- **Other branches:** pushes to `main` or `phase-2` create Preview deployments, which don't touch the live site. They may fail, because those branches can't build the demo. That's harmless.
 - **Your credit (optional):** add these under **Settings → Environment Variables**, then repeat step 5.
 
 | Variable | Shows on the tour page |
