@@ -64,8 +64,14 @@ function runExpress(express: (req: IncomingMessage, res: ServerResponse) => void
 
 async function handle(request: Request): Promise<Response> {
   if (process.env.DEMO_MODE !== "true") return Response.json({ success: false, error: "Route not found" }, { status: 404 });
-  app ??= import("@lettr/api/app").then(({ createApp }) => createApp());
-  return runExpress(await app, request, Buffer.from(await request.arrayBuffer()));
+  try {
+    app ??= import("@lettr/api/app").then(({ createApp }) => createApp());
+    return runExpress(await app, request, Buffer.from(await request.arrayBuffer()));
+  } catch (error) {
+    app = undefined;
+    console.error("The API could not start:", error);
+    return Response.json({ success: false, error: "The API could not start. Check this deployment's environment variables." }, { status: 503 });
+  }
 }
 
 export { handle as DELETE, handle as GET, handle as HEAD, handle as OPTIONS, handle as PATCH, handle as POST, handle as PUT };

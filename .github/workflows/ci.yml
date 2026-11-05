@@ -165,6 +165,16 @@ jobs:
         env:
           VERCEL_ENV: production
           VERCEL_TELEMETRY_DISABLED: "1"
+      - name: A production build without a database stops and says why
+        run: |
+          if env -u DATABASE_URL VERCEL_ENV=production node scripts/vercel-build.mjs > /tmp/no-db.log 2>&1; then
+            echo "It should have refused to build"; exit 1
+          fi
+          grep -q "DATABASE_URL is missing from this production build" /tmp/no-db.log
+      - name: A Preview builds without a database (Vercel's own builder)
+        run: env -u DATABASE_URL VERCEL_ENV=preview npx --yes vercel@65.11.0 build --yes
+        env:
+          VERCEL_TELEMETRY_DISABLED: "1"
       - name: Upload logs and traces
         if: failure()
         uses: actions/upload-artifact@v4

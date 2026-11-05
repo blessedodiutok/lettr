@@ -21,7 +21,7 @@ You'll work in two places:
 
 **Do:** change the branch name from `main` to `vercel-portfolio`, then click **Save**.
 
-If Vercel answers **No deployments found for 'vercel-portfolio'. Deploy the branch, then retry**, it has never built that branch. Do steps 2 to 4, then get a first build of the branch: push a commit to it, or use a Deploy Hook (**Settings → Git → Deploy Hooks**, with the branch `vercel-portfolio`). Once the branch appears under **Deployments**, save this setting again.
+If Vercel answers **No deployments found for 'vercel-portfolio'. Deploy the branch, then retry**, it has never built that branch. Do steps 2 to 4, then get a first build of the branch: push a commit to it, or use a Deploy Hook (**Settings → Git → Deploy Hooks**, with the branch `vercel-portfolio`). Once the branch appears under **Deployments**, save this setting again. A branch's first build is a Preview, and a Preview builds without a database. A production build won't: it stops and names what's missing.
 
 **What it does:** new production deployments are built from `vercel-portfolio`. The live site doesn't change yet.
 
