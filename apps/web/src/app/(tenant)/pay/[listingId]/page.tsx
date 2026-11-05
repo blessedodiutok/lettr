@@ -12,6 +12,7 @@ import { useInquiryForListing } from "../../../../hooks/useInquiries";
 import { useListing } from "../../../../hooks/useListings";
 import { useInitiatePayment } from "../../../../hooks/usePayments";
 import { errorMessage } from "../../../../lib/api";
+import { IS_DEMO } from "../../../../lib/demo";
 
 export default function CheckoutPage() {
   const { listingId } = useParams<{ listingId: string }>();
@@ -82,7 +83,7 @@ export default function CheckoutPage() {
         </p>
         <p className="flex gap-3">
           <Lock className="size-5 shrink-0 text-ink-2" aria-hidden />
-          You&apos;ll pay on Paystack&apos;s secure page by card, bank transfer or USSD. Large transfers may need your bank&apos;s approval — that&apos;s why the home is held for 72 hours.
+          {IS_DEMO ? "This is a demo, so no money moves and no payment details are asked for. The next page simulates a successful payment." : "You'll pay on Paystack's secure page by card, bank transfer or USSD. Large transfers may need your bank's approval — that's why the home is held for 72 hours."}
         </p>
       </Card>
 
@@ -100,9 +101,9 @@ export default function CheckoutPage() {
           })
         }
       >
-        Pay {formatCurrency(home.moveInCost.total)} securely
+        {IS_DEMO ? "Continue to simulated payment" : `Pay ${formatCurrency(home.moveInCost.total)} securely`}
       </Button>
-      <p className="-mt-3 text-center text-xs text-muted">Payments processed by Paystack. Lettr never sees your card details.</p>
+      <p className="-mt-3 text-center text-xs text-muted">{IS_DEMO ? "Simulated checkout. The real one is handled by Paystack." : "Payments processed by Paystack. Lettr never sees your card details."}</p>
     </div>
   );
 }

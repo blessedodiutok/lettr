@@ -6,6 +6,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { IS_SAMPLE_CONTENT } from "../../content/sample";
 import { cn } from "../../lib/cn";
+import { IS_DEMO } from "../../lib/demo";
 
 export function Logo({ className, href = "/" }: { className?: string; href?: string }) {
   return (
@@ -15,12 +16,12 @@ export function Logo({ className, href = "/" }: { className?: string; href?: str
   );
 }
 
-/** Marks fictitious marketing content outside production builds. */
+/** Marks fictitious marketing content outside production builds, and always in the demo. */
 export function SampleMarker({ className }: { className?: string }) {
-  if (!IS_SAMPLE_CONTENT || process.env.NODE_ENV === "production") return null;
+  if (!IS_SAMPLE_CONTENT || (process.env.NODE_ENV === "production" && !IS_DEMO)) return null;
   return (
     <span
-      title="Placeholder content — replace with real data before launch"
+      title={IS_DEMO ? "Made-up content for this demo" : "Placeholder content — replace with real data before launch"}
       className={cn("inline-flex items-center rounded-full border border-dashed border-warn/60 bg-warn-soft px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-warn", className)}
     >
       Sample content

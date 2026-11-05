@@ -8,10 +8,22 @@ import { Button } from "../../../../components/ui/button";
 import { Field, Input } from "../../../../components/ui/field";
 import { useForgotPassword } from "../../../../hooks/useAuth";
 import { errorMessage } from "../../../../lib/api";
+import { IS_DEMO } from "../../../../lib/demo";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const forgot = useForgotPassword();
+
+  if (IS_DEMO) {
+    return (
+      <>
+        <AuthHeading title="No passwords to reset" description="This demo sends no emails, and its accounts don't need a password. Choose one on the login page." />
+        <Button asChild variant="secondary" block>
+          <Link href="/auth/login">Back to login</Link>
+        </Button>
+      </>
+    );
+  }
 
   if (forgot.isSuccess) {
     return (

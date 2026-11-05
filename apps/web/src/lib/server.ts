@@ -2,7 +2,8 @@ import "server-only";
 
 // Server-side API access for Server Components (public data only — no session).
 
-const API_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const DEMO_URL = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : process.env.NEXT_PUBLIC_APP_URL;
+const API_URL = process.env.API_INTERNAL_URL || (process.env.DEMO_MODE === "true" ? DEMO_URL : process.env.NEXT_PUBLIC_API_URL) || "http://localhost:4000";
 
 export async function fetchPublic<T>(path: string, revalidateSeconds = 60): Promise<T | null> {
   try {

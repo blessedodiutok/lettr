@@ -1,4 +1,6 @@
 // File storage. Cloudinary when configured; local disk otherwise (development only).
+// The demo stores nothing: photos become sample images and documents a sample
+// placeholder, so visitors can't publish their own files or leave real IDs here.
 //  - Public images (property photos, avatars) get a public URL.
 //  - Private files (identity documents) are stored as authenticated Cloudinary
 //    assets or outside the public folder, and are only readable through
@@ -8,9 +10,10 @@ import { v2 as cloudinary } from "cloudinary";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { env, isProduction } from "../config/env.js";
+import { env, isDemo, isProduction } from "../config/env.js";
+import { DEMO_DOCUMENT_ID, randomSamplePhoto } from "../demo/samplePhotos.js";
 
-export const useCloudinary = Boolean(env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET);
+export const useCloudinary = !isDemo && Boolean(env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET);
 
 if (useCloudinary) {
   cloudinary.config({
@@ -19,7 +22,7 @@ if (useCloudinary) {
     api_secret: env.CLOUDINARY_API_SECRET,
     secure: true,
   });
-} else if (!isProduction) {
+} else if (!isProduction && !isDemo) {
   console.warn("⚠️  Cloudinary not configured — files are stored on local disk (development only)");
 }
 
@@ -80,6 +83,7 @@ function assertSignature(buffer: Buffer, mimeType: string) {
 }
 
 export async function storePublicImage(buffer: Buffer, folder: string, mimeType: string): Promise<StoredFile> {
+  if (isDemo) return { url: randomSamplePhoto(), publicId: `demo:photo/${crypto.randomUUID()}` };
   assertSignature(buffer, mimeType);
   if (useCloudinary) return uploadToCloudinary(buffer, folder, { image: true });
   if (isProduction) throw new Error("File storage is not configured");
@@ -87,6 +91,7 @@ export async function storePublicImage(buffer: Buffer, folder: string, mimeType:
 }
 
 export async function storePrivateFile(buffer: Buffer, folder: string, mimeType: string): Promise<StoredFile> {
+  if (isDemo) return { url: DEMO_DOCUMENT_ID, publicId: DEMO_DOCUMENT_ID };
   assertSignature(buffer, mimeType);
   if (useCloudinary) return uploadToCloudinary(buffer, folder, { private: true });
   if (isProduction) throw new Error("File storage is not configured");
@@ -94,6 +99,7 @@ export async function storePrivateFile(buffer: Buffer, folder: string, mimeType:
 }
 
 export async function deleteStoredFile(publicId: string): Promise<void> {
+  if (publicId.startsWith("demo:")) return;
   if (publicId.startsWith("local:")) {
     await fs.rm(path.join(LOCAL_UPLOAD_ROOT, publicId.slice("local:".length)), { force: true });
     return;
@@ -102,7 +108,8 @@ export async function deleteStoredFile(publicId: string): Promise<void> {
 }
 
 /** A link to a private file that expires after `ttlSeconds` (Cloudinary), or the local path for the admin route. */
-export function privateFileAccess(publicId: string, ttlSeconds = 600): { kind: "url"; url: string } | { kind: "local"; filePath: string } {
+export function privateFileAccess(publicId: string, ttlSeconds = 600): { kind: "url"; url: string } | { kind: "local"; filePath: string } | { kind: "demo" } {
+  if (publicId === DEMO_DOCUMENT_ID) return { kind: "demo" };
   if (publicId.startsWith("local:")) {
     return { kind: "local", filePath: path.join(LOCAL_UPLOAD_ROOT, publicId.slice("local:".length)) };
   }

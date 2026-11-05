@@ -1,3 +1,4 @@
+import { IS_DEMO } from "../../lib/demo";
 import Link from "next/link";
 import { Logo, ThemeToggle } from "./brand";
 
@@ -54,7 +55,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-line">
         <div className="page flex flex-col gap-3 py-5 text-[13px] text-muted sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} Lettr Technologies Ltd · Lagos, Nigeria · Payments by Paystack</p>
+          <p>{IS_DEMO ? "Lettr is a portfolio demo. Fictional homes, simulated payments." : `© ${new Date().getFullYear()} Lettr Technologies Ltd · Lagos, Nigeria · Payments by Paystack`}</p>
           <ThemeToggle />
         </div>
       </div>

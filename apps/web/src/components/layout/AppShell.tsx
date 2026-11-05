@@ -32,6 +32,7 @@ import { homeFor, useAuthStore } from "../../stores/authStore";
 import { Skeleton } from "../ui/display";
 import { Logo } from "./brand";
 import { NotificationBell, UserMenu } from "./UserMenu";
+import { IS_DEMO } from "../../lib/demo";
 
 interface NavItem {
   href: string;
@@ -72,6 +73,10 @@ const NAV: Record<Role, NavItem[]> = {
   ],
 };
 
+// The demo's bar takes one 2.75rem line above the shell at desktop widths.
+const SHELL_HEIGHT = IS_DEMO ? "min-h-svh lg:min-h-[calc(100svh-2.75rem)]" : "min-h-svh";
+const SIDEBAR_HEIGHT = IS_DEMO ? "h-[calc(100svh-2.75rem)]" : "h-svh";
+
 function isActive(pathname: string, href: string) {
   if (["/dashboard", "/admin", "/landlord/dashboard"].includes(href)) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -95,7 +100,7 @@ export function AppShell({ children, roles }: { children: React.ReactNode; roles
 
   if (status !== "authenticated" || !user || (roles && !roles.includes(user.role))) {
     return (
-      <div className="flex min-h-svh">
+      <div className={cn("flex", SHELL_HEIGHT)}>
         <div className="hidden w-64 border-r border-line bg-surface p-5 lg:block">
           <Skeleton className="mb-8 h-7 w-24" />
           {Array.from({ length: 6 }).map((_, i) => (
@@ -114,8 +119,8 @@ export function AppShell({ children, roles }: { children: React.ReactNode; roles
   const tabs = nav.filter((item) => item.tab).slice(0, 5);
 
   return (
-    <div className="flex min-h-svh">
-      <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col border-r border-line bg-surface lg:flex">
+    <div className={cn("flex", SHELL_HEIGHT)}>
+      <aside className={cn("sticky top-0 hidden w-64 shrink-0 flex-col border-r border-line bg-surface lg:flex", SIDEBAR_HEIGHT)}>
         <div className="px-6 pb-5 pt-6">
           <Logo href={homeFor(user.role)} />
         </div>
@@ -141,7 +146,7 @@ export function AppShell({ children, roles }: { children: React.ReactNode; roles
         </nav>
         <div className="border-t border-line p-4">
           <Link href="/" className="text-[13px] text-muted hover:text-navy">
-            ← Back to lettr.ng
+            ← Back to the website
           </Link>
         </div>
       </aside>

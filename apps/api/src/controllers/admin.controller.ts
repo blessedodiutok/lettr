@@ -1,6 +1,7 @@
 // HTTP handlers for /api/admin
 
 import type { Request, Response } from "express";
+import { DEMO_DOCUMENT_SVG } from "../demo/samplePhotos.js";
 import * as adminService from "../services/admin.service.js";
 
 type ListQuery = Parameters<typeof adminService.listUsers>[0];
@@ -22,6 +23,7 @@ export async function verificationDocument(req: Request, res: Response) {
   const access = await adminService.getVerificationDocumentAccess(id(req), req.user!.id);
   res.setHeader("Cache-Control", "no-store");
   if (access.kind === "url") res.redirect(access.url);
+  else if (access.kind === "demo") res.type("image/svg+xml").send(DEMO_DOCUMENT_SVG);
   else res.sendFile(access.filePath);
 }
 

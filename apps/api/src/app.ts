@@ -7,8 +7,10 @@ import helmet from "helmet";
 import morgan from "morgan";
 import crypto from "node:crypto";
 
-import { env, isProduction } from "./config/env.js";
+import { env, isDemo, isProduction } from "./config/env.js";
 import * as paymentsController from "./controllers/payments.controller.js";
+import { demoGuard, demoWriteLimit, finishWorkBeforeResponding } from "./demo/guards.js";
+import demoRouter from "./demo/routes.js";
 import { moneyAsNumber } from "./lib/jsonReplacer.js";
 import { prisma } from "./lib/prisma.js";
 import { getStore } from "./lib/redis.js";
@@ -51,6 +53,8 @@ export function createApp(): express.Application {
   morgan.token("id", (req) => (req as express.Request & { id?: string }).id ?? "-");
   app.use(morgan(isProduction ? ":id :remote-addr :method :url :status :res[content-length] - :response-time ms" : "dev"));
 
+  if (isDemo) app.use(finishWorkBeforeResponding, demoGuard);
+
   // Paystack webhook needs the raw body for signature verification.
   app.post("/api/payments/webhook", express.raw({ type: "application/json", limit: "1mb" }), paymentsController.paystackWebhook);
 
@@ -59,7 +63,7 @@ export function createApp(): express.Application {
   app.use(cookieParser());
 
   // Locally stored uploads (development without Cloudinary).
-  if (!useCloudinary) app.use("/api/media", express.static(LOCAL_PUBLIC_DIR, { maxAge: "7d", fallthrough: false }));
+  if (!useCloudinary && !isDemo) app.use("/api/media", express.static(LOCAL_PUBLIC_DIR, { maxAge: "7d", fallthrough: false }));
 
   app.get("/api/health", async (_req, res) => {
     const checks = { database: false, store: false };
@@ -80,6 +84,10 @@ export function createApp(): express.Application {
   });
 
   app.use("/api", ...generalLimit);
+  if (isDemo) {
+    app.use("/api", demoWriteLimit);
+    app.use("/api/demo", demoRouter);
+  }
   app.use("/api/auth", authRouter);
   app.use("/api/listings", listingsRouter);
   app.use("/api/inquiries", inquiriesRouter);

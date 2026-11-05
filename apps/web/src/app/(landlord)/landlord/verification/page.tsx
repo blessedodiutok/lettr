@@ -9,6 +9,7 @@ import { Card, PageHeader, Skeleton, StatusPill } from "../../../../components/u
 import { Field, Input, Select } from "../../../../components/ui/field";
 import { useMyDocuments, useUploadDocument } from "../../../../hooks/useAccount";
 import { useRefreshMe } from "../../../../hooks/useRefreshMe";
+import { IS_DEMO } from "../../../../lib/demo";
 import { useAuthStore } from "../../../../stores/authStore";
 import { toast } from "../../../../stores/toastStore";
 
@@ -27,6 +28,11 @@ export default function VerificationPage() {
 
   return (
     <>
+      {IS_DEMO && (
+        <p className="mb-4 rounded-card border border-dashed border-warn/60 bg-warn-soft px-4 py-3 text-sm text-warn">
+          Demo: please don't enter real ID details. Your file stays on your device, the number isn't saved, and a sample document goes to the admin queue instead.
+        </p>
+      )}
       <PageHeader title="Verification" description="Tenants trust landlords who've proven who they are. Verify once and every listing shows the badge." />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid content-start gap-5">

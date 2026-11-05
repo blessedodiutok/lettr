@@ -707,3 +707,16 @@ model AdminAction {
     @@index([createdAt])
     @@map("admin_actions")
 }
+
+// ─────────────────────────────────────────────
+// KEY-VALUE STORE (portfolio demo only)
+// ─────────────────────────────────────────────
+
+// Takes the place of Redis in the demo. Unused when the API runs normally.
+model KeyValueEntry {
+    key       String    @id
+    value     String
+    expiresAt DateTime?
+
+    @@index([expiresAt])
+}

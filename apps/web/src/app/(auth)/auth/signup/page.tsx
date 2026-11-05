@@ -9,11 +9,13 @@ import { Suspense } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { AuthHeading, FormError } from "../../../../components/auth/AuthHeading";
+import { DemoAccounts } from "../../../../components/demo/DemoAccounts";
 import { Button } from "../../../../components/ui/button";
 import { Field, Input } from "../../../../components/ui/field";
 import { useSignup } from "../../../../hooks/useAuth";
 import { errorMessage } from "../../../../lib/api";
 import { cn } from "../../../../lib/cn";
+import { IS_DEMO } from "../../../../lib/demo";
 
 type Values = z.input<typeof SignupSchema>;
 
@@ -109,6 +111,14 @@ function SignupForm() {
 }
 
 export default function SignupPage() {
+  if (IS_DEMO) {
+    return (
+      <>
+        <AuthHeading title="Sign-up is off in this demo" description="That way, nobody's personal details are collected. These accounts are ready to use, with rentals already in progress." />
+        <DemoAccounts stacked />
+      </>
+    );
+  }
   return (
     <Suspense>
       <SignupForm />

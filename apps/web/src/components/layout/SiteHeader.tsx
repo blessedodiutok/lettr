@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "../../lib/cn";
+import { IS_DEMO } from "../../lib/demo";
 import { homeFor, useAuthStore } from "../../stores/authStore";
 import { Button } from "../ui/button";
 import { Logo } from "./brand";
@@ -57,7 +58,7 @@ export function SiteHeader() {
                 <Link href="/auth/login">Log in</Link>
               </Button>
               <Button asChild size="sm">
-                <Link href="/auth/signup">Create account</Link>
+                <Link href={IS_DEMO ? "/demo" : "/auth/signup"}>{IS_DEMO ? "Try the demo" : "Create account"}</Link>
               </Button>
             </>
           ) : (

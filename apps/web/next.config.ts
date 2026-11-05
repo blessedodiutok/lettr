@@ -1,11 +1,14 @@
 // Next.js 16 configuration.
 // The browser talks to the API through the /api rewrite, so auth cookies are
-// first-party and no CORS is involved.
+// first-party and no CORS is involved. In the portfolio demo (DEMO_MODE=true)
+// the API runs inside this app instead: see src/app/api/[...path]/route.ts.
 
 import type { NextConfig } from "next";
 import path from "node:path";
 
 const API_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const IS_DEMO = process.env.DEMO_MODE === "true";
+const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined;
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -15,11 +18,17 @@ const securityHeaders = [
   ...(process.env.NODE_ENV === "production"
     ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }]
     : []),
+  // The demo's listings are fictional, so they must not appear in search results for real homes.
+  ...(IS_DEMO ? [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] : []),
 ];
 
 const nextConfig: NextConfig = {
   turbopack: { root: path.resolve(process.cwd(), "../..") },
   transpilePackages: ["@lettr/types", "@lettr/zod-schemas", "@lettr/utils", "@lettr/config"],
+  env: {
+    NEXT_PUBLIC_DEMO_MODE: IS_DEMO ? "true" : "false",
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? productionUrl ?? "http://localhost:3000",
+  },
 
   // Photos are resized by Cloudinary/Unsplash themselves (see src/lib/imageLoader.ts),
   // so any host works and Next's optimiser isn't needed.
@@ -30,7 +39,7 @@ const nextConfig: NextConfig = {
   },
 
   async rewrites() {
-    return [{ source: "/api/:path*", destination: `${API_URL}/api/:path*` }];
+    return IS_DEMO ? [] : [{ source: "/api/:path*", destination: `${API_URL}/api/:path*` }];
   },
 
   // Old URLs from before the Phase 2 restructure.

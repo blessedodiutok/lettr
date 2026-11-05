@@ -4,11 +4,11 @@
 
 import nodemailer from "nodemailer";
 import { Resend } from "resend";
-import { env, isProduction } from "../config/env.js";
+import { env, isDemo, isProduction } from "../config/env.js";
 
-const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
+const resend = env.RESEND_API_KEY && !isDemo ? new Resend(env.RESEND_API_KEY) : null;
 
-const smtpTransport = env.SMTP_HOST
+const smtpTransport = env.SMTP_HOST && !isDemo
   ? nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
@@ -24,6 +24,8 @@ export interface EmailPayload {
 }
 
 export async function sendEmail(payload: EmailPayload): Promise<void> {
+  // The demo's accounts are fictional, so nothing is ever sent.
+  if (isDemo) return;
   const { to, subject, html, text } = payload;
   const from = env.EMAIL_FROM;
   const toArray = Array.isArray(to) ? to : [to];

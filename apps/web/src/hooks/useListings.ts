@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, errorMessage } from "../lib/api";
+import { demoPlaceholderFile, IS_DEMO } from "../lib/demo";
 import type { Listing, Paginated, Photo } from "../lib/types";
 import { useAuthStore } from "../stores/authStore";
 import { toast } from "../stores/toastStore";
@@ -129,7 +130,7 @@ export function useUploadPhotos(propertyId: string) {
   return useMutation({
     mutationFn: async ({ files, onProgress }: { files: File[]; onProgress?: (percent: number) => void }) => {
       const form = new FormData();
-      files.forEach((file) => form.append("photos", file));
+      files.forEach((file) => form.append("photos", IS_DEMO ? demoPlaceholderFile() : file));
       return api<Photo[]>("post", `/api/uploads/photos/${propertyId}`, form, {
         onUploadProgress: (event) => event.total && onProgress?.(Math.round((event.loaded / event.total) * 100)),
         timeout: 120_000,

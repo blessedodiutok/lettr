@@ -14,6 +14,7 @@ vi.mock("../lib/prisma.js", () => ({ prisma }));
 vi.mock("../config/env.js", () => ({
   env: { NODE_ENV: "test", WEB_URL: "http://localhost:3000", PAYSTACK_TRANSFER_ENABLED: false, OTP_EXPIRY_SECONDS: 600 },
   isProduction: false,
+  isDemo: false,
   isPaystackSimulated: true,
 }));
 vi.mock("./notify.js", () => ({ notify: vi.fn(), notifyLater: vi.fn() }));

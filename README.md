@@ -4,6 +4,9 @@ Rent directly from verified landlords in Nigeria — no agent fees. Tenants pay 
 
 This monorepo contains the API, the web app, the mobile app and the code they share.
 
+- **Where development stands:** [docs/CHECKPOINT.md](docs/CHECKPOINT.md)
+- **Public portfolio demo on Vercel's free plan:** [docs/VERCEL.md](docs/VERCEL.md)
+
 ```
 apps/
   api/      Express 5 + Prisma 7 (PostgreSQL) — auth, listings, offers, escrow, admin
@@ -33,7 +36,7 @@ cp apps/web/.env.example apps/web/.env.local
 cp apps/mobile/.env.example apps/mobile/.env
 
 pnpm db:migrate                            # apply migrations
-pnpm db:seed                               # sample landlords, tenants, listings and an admin
+pnpm db:seed                               # sample data. ⚠ Deletes everything already in the database
 pnpm dev                                   # API :4000, web :3000, Expo dev server
 ```
 
@@ -51,7 +54,7 @@ Open http://localhost:3000. Every seeded account uses the password `Lettr@2024!`
 | Landlord | emeka@lettr-test.com, amaka@lettr-test.com     |
 | Tenant   | tunde@lettr-test.com, ngozi@lettr-test.com, chidi@lettr-test.com |
 
-`pnpm db:seed` resets the sample data. To add only an admin to an existing database, run `pnpm db:seed-admin` (set `ADMIN_EMAIL` and `ADMIN_PASSWORD` to choose the credentials).
+**`pnpm db:seed` deletes all data first, including any accounts you created yourself.** Run it only on a database you're happy to empty. To add only an admin to an existing database, run `pnpm db:seed-admin` (set `ADMIN_EMAIL` and `ADMIN_PASSWORD` to choose the credentials).
 
 ### Running without third-party keys
 
@@ -94,7 +97,7 @@ Pricing: a 3% platform fee is shown on every listing. The savings figure compare
 | `pnpm test:e2e`          | Playwright browser tests against a running web + API (see below) |
 | `pnpm build`             | Production builds                                                |
 | `pnpm db:migrate`        | Create/apply migrations in development                           |
-| `pnpm db:seed`           | Reset sample data (refuses to run in production)                 |
+| `pnpm db:seed`           | ⚠ Delete everything and load sample data (not in production)     |
 | `pnpm db:seed-admin`     | Create or update the admin account only                          |
 | `pnpm db:studio`         | Browse the database                                              |
 | `pnpm --filter @lettr/api db:cleanup-smoke` | Delete accounts whose email starts with `smoke-` and everything they created |

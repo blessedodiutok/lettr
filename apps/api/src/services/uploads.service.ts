@@ -1,5 +1,6 @@
 // Property photos and identity documents.
 
+import { isDemo } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { deleteStoredFile, storePrivateFile, storePublicImage, type StoredFile } from "../lib/storage.js";
 import { createError } from "../middleware/errorHandler.js";
@@ -89,7 +90,7 @@ export async function uploadVerificationDocument(
   const { url, publicId } = await storePrivateFile(file.buffer, "verification", file.mimetype);
   return prisma.$transaction(async (tx) => {
     const document = await tx.verificationDocument.create({
-      data: { userId, documentType, documentNumber, documentUrl: url, publicId },
+      data: { userId, documentType, documentNumber: isDemo ? undefined : documentNumber, documentUrl: url, publicId },
       select: { id: true, documentType: true, status: true, createdAt: true },
     });
     await tx.landlordProfile.updateMany({

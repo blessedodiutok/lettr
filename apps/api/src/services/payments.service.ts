@@ -14,7 +14,7 @@ import {
   nairaToKobo,
 } from "@lettr/utils";
 import type { Prisma, UserRole } from "@prisma/client";
-import { env, isPaystackSimulated, isProduction } from "../config/env.js";
+import { env, isDemo, isPaystackSimulated, isProduction } from "../config/env.js";
 import { generateAgreementText, tenancyPeriod } from "../domain/agreement.js";
 import * as paystack from "../lib/paystack.js";
 import { prisma } from "../lib/prisma.js";
@@ -92,7 +92,7 @@ export async function initiatePayment(input: { listingId: string }, tenantId: st
             reference: payment.id,
             callbackUrl,
             metadata: { paymentId: payment.id, listingId: listing.id, tenantId, inquiryId: inquiry.id },
-            simulateUrl: `${env.WEB_URL}/pay/${listing.id}/simulate?paymentId=${payment.id}`,
+            simulateUrl: `${isDemo ? "" : env.WEB_URL}/pay/${listing.id}/simulate?paymentId=${payment.id}`,
           });
 
     await prisma.payment.update({
@@ -373,7 +373,7 @@ export async function releaseEscrow(paymentId: string, method: ReleaseMethod, op
   let transferCode: string | null = null;
   let releaseError: string | null = null;
 
-  if (env.PAYSTACK_TRANSFER_ENABLED) {
+  if (env.PAYSTACK_TRANSFER_ENABLED && !isDemo) {
     if (!profile?.bankAccountNumber || !profile.bankCode || !profile.bankAccountName) {
       await prisma.payment.update({
         where: { id: paymentId },
@@ -405,8 +405,8 @@ export async function releaseEscrow(paymentId: string, method: ReleaseMethod, op
       throw createError("The payout couldn't be sent. We'll retry automatically.", 502, { code: "PAYOUT_FAILED" });
     }
   } else {
-    transferReference = `MANUAL-${payment.id}`;
-    if (isProduction) releaseError = "Automatic transfers are disabled — pay this landlord manually";
+    transferReference = `${isDemo ? "SIMULATED" : "MANUAL"}-${payment.id}`;
+    if (isProduction && !isDemo) releaseError = "Automatic transfers are disabled — pay this landlord manually";
   }
 
   const now = new Date();

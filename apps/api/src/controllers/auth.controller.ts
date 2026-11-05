@@ -64,6 +64,11 @@ export async function login(req: Request, res: Response) {
   sendSession(req, res, session.user.role, session);
 }
 
+export async function demoLogin(req: Request, res: Response, email: string) {
+  const session = await authService.demoLogin(email, deviceLabel(req));
+  sendSession(req, res, session.user.role, session);
+}
+
 export async function verifyOtp(req: Request, res: Response) {
   const session = await authService.verifyOtp(req.body, deviceLabel(req));
   sendSession(req, res, session.user.role, session);

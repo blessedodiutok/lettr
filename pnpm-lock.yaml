@@ -162,6 +162,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 4.1.7
         version: 4.1.7(vitest@4.1.7)
+      esbuild:
+        specifier: 0.28.0
+        version: 0.28.0
       nodemon:
         specifier: 3.1.14
         version: 3.1.14
@@ -298,6 +301,9 @@ importers:
       '@hookform/resolvers':
         specifier: 5.4.0
         version: 5.4.0(react-hook-form@7.76.1(react@19.2.6))
+      '@lettr/api':
+        specifier: workspace:*
+        version: link:../api
       '@lettr/config':
         specifier: workspace:*
         version: link:../../packages/config

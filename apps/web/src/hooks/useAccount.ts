@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, errorMessage } from "../lib/api";
+import { demoPlaceholderFile, IS_DEMO } from "../lib/demo";
 import type { AppNotification, Bank, Me, PublicLandlord, Review, VerificationDocument } from "../lib/types";
 import { useAuthStore } from "../stores/authStore";
 import { toast } from "../stores/toastStore";
@@ -84,8 +85,8 @@ export function useUploadDocument() {
     mutationFn: ({ file, documentType, documentNumber }: { file: File; documentType: string; documentNumber?: string }) => {
       const form = new FormData();
       form.append("documentType", documentType);
-      if (documentNumber) form.append("documentNumber", documentNumber);
-      form.append("document", file);
+      if (documentNumber && !IS_DEMO) form.append("documentNumber", documentNumber);
+      form.append("document", IS_DEMO ? demoPlaceholderFile() : file);
       return api("post", "/api/uploads/document", form);
     },
     onSuccess: () => {

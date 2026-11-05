@@ -1,6 +1,9 @@
 // Layout for editorial pages: a title block and a readable prose column.
 
 import { cn } from "../../lib/cn";
+import { IS_DEMO } from "../../lib/demo";
+
+const DEMO_NOTICE = "Sample text for a portfolio demo. Lettr isn't a trading company, these contact details aren't real, and this page isn't legal advice or a legal agreement.";
 
 export function ContentPage({
   eyebrow,
@@ -23,7 +26,7 @@ export function ContentPage({
         {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
         <h1 className="font-display text-[34px] font-medium leading-tight text-ink sm:text-[44px]">{title}</h1>
         {intro && <p className="mt-4 text-lg text-ink-2">{intro}</p>}
-        {notice && <div className="mt-6 rounded-card border border-dashed border-warn/60 bg-warn-soft px-4 py-3 text-sm text-warn">{notice}</div>}
+        {notice && <div className="mt-6 rounded-card border border-dashed border-warn/60 bg-warn-soft px-4 py-3 text-sm text-warn">{IS_DEMO ? DEMO_NOTICE : notice}</div>}
       </header>
       <div className={cn("mt-10 grid gap-12", aside && "lg:grid-cols-[minmax(0,1fr)_300px]")}>
         <div className="prose-lettr min-w-0 max-w-3xl">{children}</div>

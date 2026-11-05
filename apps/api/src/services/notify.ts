@@ -52,7 +52,15 @@ export async function notify(input: NotifyInput): Promise<void> {
   await Promise.all(deliveries);
 }
 
+const pending = new Set<Promise<void>>();
+
 /** Fire-and-forget variant for code paths that must not wait on delivery. */
 export function notifyLater(input: NotifyInput): void {
-  void notify(input);
+  const delivery = notify(input).finally(() => pending.delete(delivery));
+  pending.add(delivery);
+}
+
+/** Wait for notifications already in flight. */
+export async function flushNotifications(): Promise<void> {
+  await Promise.all(pending);
 }

@@ -8,10 +8,12 @@ import { Suspense } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { AuthHeading, FormError } from "../../../../components/auth/AuthHeading";
+import { DemoAccounts } from "../../../../components/demo/DemoAccounts";
 import { Button } from "../../../../components/ui/button";
 import { Field, Input } from "../../../../components/ui/field";
 import { useLogin } from "../../../../hooks/useAuth";
 import { errorCode, errorData, errorMessage } from "../../../../lib/api";
+import { IS_DEMO } from "../../../../lib/demo";
 
 type Values = z.input<typeof LoginSchema>;
 
@@ -20,7 +22,11 @@ function LoginForm() {
   const next = params.get("next");
   const router = useRouter();
   const login = useLogin();
-  const { register, handleSubmit, formState } = useForm<Values>({ resolver: zodResolver(LoginSchema) });
+  const { register, handleSubmit, formState } = useForm<Values>({
+    resolver: zodResolver(LoginSchema),
+    // The demo's shared tenant account. These details are public on purpose.
+    defaultValues: IS_DEMO ? { email: "tunde@lettr-test.com", password: "Lettr@2024!" } : undefined,
+  });
 
   const onSubmit = handleSubmit((values) =>
     login.mutate(
@@ -38,7 +44,13 @@ function LoginForm() {
 
   return (
     <>
-      <AuthHeading title="Welcome back" description="Log in to continue to your home or your listings." />
+      <AuthHeading title={IS_DEMO ? "Try the demo" : "Welcome back"} description={IS_DEMO ? "Pick an account. No details needed." : "Log in to continue to your home or your listings."} />
+      {IS_DEMO && (
+        <div className="mb-8">
+          <DemoAccounts stacked />
+          <p className="mt-6 text-sm text-muted">Or use the login form, filled in with the tenant's details:</p>
+        </div>
+      )}
       <form onSubmit={onSubmit} noValidate className="grid gap-5">
         <Field label="Email address" error={formState.errors.email?.message}>
           <Input type="email" autoComplete="email" {...register("email")} />

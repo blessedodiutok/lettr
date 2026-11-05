@@ -20,7 +20,8 @@ function createPrismaClient(): PrismaClient {
     );
   }
 
-  const adapter = new PrismaPg({ connectionString });
+  // Each serverless instance keeps its own pool, so the demo keeps them small.
+  const adapter = new PrismaPg({ connectionString, ...(process.env.DEMO_MODE === "true" ? { max: 3 } : {}) });
 
   return new PrismaClient({
     adapter,

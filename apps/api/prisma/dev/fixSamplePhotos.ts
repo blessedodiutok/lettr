@@ -4,7 +4,7 @@
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
-import { SAMPLE_PHOTO_URLS } from "./samplePhotos.js";
+import { SAMPLE_PHOTO_URLS } from "../../src/demo/samplePhotos.js";
 
 if (process.env.NODE_ENV === "production") throw new Error("Refusing to run in production");
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo, SampleMarker } from "../../../components/layout/brand";
 import { SAMPLE_TESTIMONIALS } from "../../../content/sample";
+import { IS_DEMO } from "../../../lib/demo";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const quote = SAMPLE_TESTIMONIALS[0];
@@ -18,7 +19,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             {quote.name} · {quote.detail}
           </figcaption>
         </figure>
-        <p className="relative text-xs text-hero-muted">Payments secured by Paystack · No agent fees</p>
+        <p className="relative text-xs text-hero-muted">{IS_DEMO ? "Portfolio demo · Simulated payments" : "Payments secured by Paystack · No agent fees"}</p>
       </aside>
       <main id="main" className="flex flex-1 flex-col">
         <div className="flex items-center justify-between px-6 py-5 lg:hidden">

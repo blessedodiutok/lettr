@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import { useDeletePhoto, useReorderPhotos, useUploadPhotos } from "../../hooks/useListings";
 import { errorMessage } from "../../lib/api";
+import { IS_DEMO } from "../../lib/demo";
 import type { Photo } from "../../lib/types";
 import { toast } from "../../stores/toastStore";
 import { Button } from "../ui/button";
@@ -73,6 +74,7 @@ export function PhotoManager({ propertyId, photos }: { propertyId: string; photo
         <p className="mt-1 text-[13px] text-muted">
           Up to {MAX} photos · JPG, PNG or WebP · 5 MB each · {ordered.length}/{MAX} added
         </p>
+        {IS_DEMO && <p className="mt-1 text-[13px] font-medium text-warn">Demo: your photos stay on your device, and sample photos are added in their place.</p>}
         <input ref={input} type="file" accept={TYPES.join(",")} multiple className="sr-only" onChange={(e) => e.target.files && add(e.target.files)} />
         <Button className="mt-4" variant="secondary" disabled={ordered.length >= MAX || busy} onClick={() => input.current?.click()}>
           Choose photos

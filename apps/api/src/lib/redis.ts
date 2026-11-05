@@ -1,12 +1,15 @@
 // Key-value store used for OTPs, sessions, rate limits and locks.
 // Uses Redis when REDIS_URL is set (always in production) and an in-memory
-// store otherwise, so the API runs locally without Redis installed.
+// store otherwise, so the API runs locally without Redis installed. The demo
+// keeps it in PostgreSQL: serverless instances share no memory, and this leaves
+// the database as its only outside service.
 
 import { Redis } from "ioredis";
 import { env } from "../config/env.js";
+import { PostgresStore } from "./postgresStore.js";
 
 export interface KeyValueStore {
-  readonly kind: "redis" | "memory";
+  readonly kind: "redis" | "memory" | "postgres";
   connect(): Promise<void>;
   quit(): Promise<void>;
   get(key: string): Promise<string | null>;
@@ -138,7 +141,7 @@ class MemoryStore implements KeyValueStore {
 let store: KeyValueStore | undefined;
 
 export function getStore(): KeyValueStore {
-  if (!store) store = env.REDIS_URL ? new RedisStore(env.REDIS_URL) : new MemoryStore();
+  if (!store) store = env.DEMO_MODE ? new PostgresStore() : env.REDIS_URL ? new RedisStore(env.REDIS_URL) : new MemoryStore();
   return store;
 }
 

@@ -103,6 +103,14 @@ export async function login(input: { email: string; password: string }, device: 
   return { user: await getMe(user.id), ...tokens };
 }
 
+/** One-click sign-in to a shared demo account. Only reachable through the demo routes. */
+export async function demoLogin(email: string, device: string) {
+  const user = await authRepo.findUserByEmail(email);
+  if (!user?.isActive) throw createError("This demo account isn't available right now. Try resetting the demo.", 503, { code: "DEMO_NOT_READY" });
+  const tokens = await issueTokens(user, device);
+  return { user: await getMe(user.id), ...tokens };
+}
+
 export async function verifyOtp(input: { userId: string; otp: string }, device: string) {
   const user = await authRepo.findUserById(input.userId);
   if (!user) throw createError("That code is invalid or has expired.", 400, { code: "OTP_INVALID" });

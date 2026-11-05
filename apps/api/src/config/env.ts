@@ -24,7 +24,12 @@ const envSchema = z
       .default("development"),
     PORT: z.coerce.number().int().positive().default(4000),
     API_URL: z.string().url().default("http://localhost:4000"),
-    WEB_URL: z.string().url().default("http://localhost:3000"),
+    WEB_URL: z.string().url().default(process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
+    // Public portfolio demo: sample data only, and no real payments, email, push or file storage.
+    // See apps/api/src/demo/ and docs/VERCEL.md.
+    DEMO_MODE: booleanFlag,
+    // Authorises the nightly demo reset. Vercel Cron sends it as a bearer token.
+    CRON_SECRET: secret,
     CORS_ORIGINS: z.string().default("http://localhost:3000"),
     // Number of reverse proxies in front of the API (Next.js rewrites, a load balancer).
     TRUST_PROXY: z.coerce.number().int().min(0).default(1),
@@ -60,7 +65,7 @@ const envSchema = z
     SCHEDULER_ENABLED: booleanFlag.default(true),
   })
   .superRefine((value, ctx) => {
-    if (value.NODE_ENV !== "production") return;
+    if (value.NODE_ENV !== "production" || value.DEMO_MODE) return;
     if (!value.REDIS_URL) {
       ctx.addIssue({ code: "custom", path: ["REDIS_URL"], message: "REDIS_URL is required in production" });
     }
@@ -79,5 +84,7 @@ export const env = envSchema.parse(process.env);
 
 export const isProduction = env.NODE_ENV === "production";
 
-/** Paystack is "simulated" locally when no secret key is configured. */
-export const isPaystackSimulated = !env.PAYSTACK_SECRET_KEY && !isProduction;
+export const isDemo = env.DEMO_MODE;
+
+/** Paystack is "simulated" locally when no secret key is configured, and always in the demo. */
+export const isPaystackSimulated = isDemo || (!env.PAYSTACK_SECRET_KEY && !isProduction);

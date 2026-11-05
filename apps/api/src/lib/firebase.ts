@@ -2,12 +2,16 @@
 // Disabled with a single warning when credentials are missing.
 
 import admin from "firebase-admin";
-import { env } from "../config/env.js";
+import { env, isDemo } from "../config/env.js";
 
 let firebaseApp: admin.app.App | null | undefined;
 
 export function getFirebaseApp(): admin.app.App | null {
   if (firebaseApp !== undefined) return firebaseApp;
+  if (isDemo) {
+    firebaseApp = null;
+    return firebaseApp;
+  }
   if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     console.warn("⚠️  FIREBASE_SERVICE_ACCOUNT_JSON not set — push notifications disabled");
     firebaseApp = null;
@@ -38,6 +42,7 @@ export async function sendPushNotification(params: {
   body: string;
   data?: Record<string, string>;
 }): Promise<void> {
+  if (isDemo) return;
   const expoTokens = params.tokens.filter(isExpoToken);
   const fcmTokens = params.tokens.filter((token) => !isExpoToken(token));
   if (expoTokens.length) await sendExpoPush(expoTokens, params.title, params.body, params.data);
