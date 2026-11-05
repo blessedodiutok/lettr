@@ -75,10 +75,9 @@ jobs:
           nohup pnpm exec tsx --conditions=lettr-source src/index.ts > /tmp/api.log 2>&1 &
           npx wait-on http://localhost:4000/api/health --timeout 60000
       - name: Build and start web
-        working-directory: apps/web
         run: |
-          pnpm build
-          nohup pnpm start -p 3000 > /tmp/web.log 2>&1 &
+          pnpm --filter @lettr/web build
+          nohup pnpm --filter @lettr/web start -p 3000 > /tmp/web.log 2>&1 &
           npx wait-on http://localhost:3000 --timeout 60000
       - name: Install browser
         working-directory: apps/web
