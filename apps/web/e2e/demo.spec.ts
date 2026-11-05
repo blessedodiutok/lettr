@@ -59,10 +59,10 @@ test("a stranger sees it's a demo, on every kind of page, and can't sign up", as
   expect(signup.status()).toBe(403);
 
   // Listing links survive a reset, because IDs are fixed.
-  await page.goto("/listings/demo-listing-05");
-  await expect(page.getByRole("heading", { name: "Mini Flat in Surulere" })).toBeVisible();
+  await page.goto("/listings/demo-listing-06");
+  await expect(page.getByRole("heading", { name: "1-Bedroom Flat in Ajah" })).toBeVisible();
 
-  const listing = await (await page.request.get("/api/listings/demo-listing-05")).json();
+  const listing = await (await page.request.get("/api/listings/demo-listing-06")).json();
   expect(typeof listing.data.annualRent).toBe("number");
 
   expect(problems).toEqual([]);
@@ -212,7 +212,7 @@ test("no page scrolls sideways at phone width, in light or dark", async ({ brows
   for (const colorScheme of ["light", "dark"] as const) {
     const context = await browser.newContext({ viewport: { width: 360, height: 740 }, colorScheme });
     const page = await context.newPage();
-    for (const path of ["/", "/demo", "/auth/login", "/auth/signup", "/listings", "/listings/demo-listing-05", "/contact"]) {
+    for (const path of ["/", "/demo", "/auth/login", "/auth/signup", "/listings", "/listings/demo-listing-06", "/contact"]) {
       await page.goto(path);
       await page.waitForLoadState("networkidle").catch(() => undefined);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
