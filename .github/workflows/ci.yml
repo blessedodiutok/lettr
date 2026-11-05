@@ -12,7 +12,7 @@ concurrency:
 jobs:
   checks:
     name: Typecheck, lint, unit tests, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -35,7 +35,7 @@ jobs:
 
   e2e:
     name: End-to-end (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: checks
     services:
       postgres:
@@ -107,7 +107,7 @@ jobs:
 
   demo:
     name: Portfolio demo (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: checks
     services:
       postgres:
@@ -154,6 +154,18 @@ jobs:
         env:
           E2E_DEMO: "1"
           E2E_BASE_URL: http://localhost:3000
+      - name: Package with Vercel's own builder
+        run: |
+          mkdir -p .vercel
+          cat > .vercel/project.json <<'JSON'
+          {"projectId":"prj_ci","orgId":"team_ci","settings":{"framework":"nextjs","rootDirectory":"apps/web","sourceFilesOutsideRootDirectory":true,"nodeVersion":"22.x"}}
+          JSON
+          npx --yes vercel@65.11.0 build --prod --yes
+          node -e "const c=JSON.parse(require('fs').readFileSync('.vercel/output/config.json'));if(!c.crons?.some((j)=>j.path==='/api/demo/reset'))throw new Error('The nightly reset is missing from the build');console.log('crons',JSON.stringify(c.crons))"
+          du -sh .vercel/output/functions
+        env:
+          VERCEL_ENV: production
+          VERCEL_TELEMETRY_DISABLED: "1"
       - name: Upload logs and traces
         if: failure()
         uses: actions/upload-artifact@v4

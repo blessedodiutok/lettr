@@ -79,9 +79,19 @@ The README's "Before going live" section has the full checklist.
 | Tests | `apps/api/src/**/*.test.ts`, `apps/web/src/proxy.test.ts`, `apps/web/e2e/` |
 | CI | `.github/workflows/ci.yml` |
 
+## Found after this checkpoint
+
+Building the `vercel-portfolio` branch exposed three bugs that also exist at this tag. They're fixed on that branch only:
+
+| Bug | Effect | Fix |
+| --- | --- | --- |
+| The API's money serializer never ran | Money reached clients as strings. The tenant's "saved" total on Payments is wrong with two or more payments | Commit `7614b48`, which can be cherry-picked as it is |
+| The seed's delete order fails once a dispute exists | `pnpm db:seed` crashes on a database that has been used | `TRUNCATE` in `apps/api/src/demo/sampleData.ts` |
+| `pnpm db:seed` gives no warning that it deletes everything | Accounts you created yourself are lost | Warnings in the README |
+
 ## Recommended next steps
 
-1. Review the running app. The README's "Getting started" section has the commands and seeded logins.
-2. Merge `phase-2` into `main` once the review is done. It is unmerged on purpose.
+1. Review the running app. The README's "Getting started" section has the commands and seeded logins. Note that `pnpm db:seed` deletes everything in the database.
+2. Merge `phase-2` into `main` once the review is done, with the fixes above. It is unmerged on purpose.
 3. Confirm the CI workflow passes on GitHub and fix anything it finds.
 4. To continue toward launch, start Phase 3 in this order: staging with test-mode keys, device testing, operations (error tracking, logs, job queue, backups), PDFs, then audits.
