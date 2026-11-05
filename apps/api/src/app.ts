@@ -1,6 +1,5 @@
 // Express 5 application factory — middleware stack and routers.
 
-import { Prisma } from "@prisma/client";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
@@ -10,6 +9,7 @@ import crypto from "node:crypto";
 
 import { env, isProduction } from "./config/env.js";
 import * as paymentsController from "./controllers/payments.controller.js";
+import { moneyAsNumber } from "./lib/jsonReplacer.js";
 import { prisma } from "./lib/prisma.js";
 import { getStore } from "./lib/redis.js";
 import { LOCAL_PUBLIC_DIR, useCloudinary } from "./lib/storage.js";
@@ -29,7 +29,7 @@ import usersRouter from "./routes/users.js";
 export function createApp(): express.Application {
   const app = express();
   app.set("trust proxy", env.TRUST_PROXY);
-  app.set("json replacer", (_key: string, value: unknown) => (value instanceof Prisma.Decimal ? value.toNumber() : value));
+  app.set("json replacer", moneyAsNumber);
 
   app.use(helmet({ crossOriginResourcePolicy: { policy: "same-site" } }));
   app.use(
