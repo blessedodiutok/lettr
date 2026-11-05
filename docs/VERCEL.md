@@ -6,45 +6,112 @@ To see where the main product stands, read [CHECKPOINT.md](CHECKPOINT.md). This 
 
 ## Deploy it
 
-You need a Vercel account connected to GitHub. The database is created from inside Vercel, and neither service asks for a card on its free plan.
+These steps assume you've already imported the repository into Vercel. If you see the old Phase 1 design, this is the fix.
 
-1. **Make this branch the one Vercel deploys.** Vercel builds the repository's default branch, which is still `main` (the Phase 1 baseline). Run:
+**Why it happens:** the current app is on the `vercel-portfolio` branch, while `main` still holds the Phase 1 baseline. Vercel [picks `main` as a new project's Production Branch](https://vercel.com/docs/git#default-configuration) whenever one exists, so you have to tell it which branch to use. Changing GitHub's default branch doesn't affect this, so you don't need `gh repo edit`.
 
-   ```bash
-   gh repo edit blessedodiutok/lettr --default-branch vercel-portfolio
-   ```
+You'll work in two places:
 
-   Alternatively, merge this branch into `main`.
+- **The Vercel website:** [vercel.com/dashboard](https://vercel.com/dashboard), then open your `lettr` project. Most of the steps happen here.
+- **A terminal, for step 4 only:** in VS Code, with the LETTR folder open, choose **Terminal → New Terminal** from the top menu. A panel opens at the bottom, and its prompt should end in `\LETTR>`.
 
-2. **Import the repository.** At [vercel.com/new](https://vercel.com/new), choose `lettr`, then click **Edit** next to Root Directory and select `apps/web`. Leave the other settings alone, because `apps/web/vercel.json` supplies them.
+### Step 1: Point Vercel at the right branch
 
-3. **Add the environment variables.** Run this and paste the output into the Environment Variables section of the same screen:
+**Where:** Vercel website, `lettr` project → **Settings** → **Environments** → **Production** → **Branch Tracking**.
 
-   ```bash
-   node scripts/vercel-env.mjs
-   ```
+**Do:** change the branch name from `main` to `vercel-portfolio`, then click **Save**.
 
-4. **Click Deploy, and let this first build fail.** It stops with a message saying `DATABASE_URL` is missing, which is expected. The project has to exist before a database can be connected to it.
+**What it does:** new production deployments are built from `vercel-portfolio`. The live site doesn't change yet.
 
-5. **Add the database.** In the project, open **Storage → Create Database → Neon**. Choose the free plan and the region **US East (N. Virginia)**, which is closest to Vercel's default function region. Connect it to the project, with Production selected.
+**Check:** reload the page. Branch Tracking still shows `vercel-portfolio`.
 
-6. **Redeploy.** Open **Deployments**, then choose **⋯ → Redeploy** on the latest one. The build creates the tables and the sample data, and the site is live.
+### Step 2: Check the Root Directory
 
-Optional settings, added in the same place and followed by a redeploy, credit you on the tour page:
+**Where:** Vercel website, `lettr` project → **Settings** → **Build and Deployment** → **Root Directory**. On some layouts it's under **General**.
 
-| Variable | Shows |
+**Do:** make sure it says `apps/web`. If it doesn't, change it and click **Save**. Leave the build and install commands as they are, because `apps/web/vercel.json` supplies them.
+
+**What it does:** tells Vercel where the web app sits inside the repository.
+
+**Check:** the field shows `apps/web` after you reload.
+
+### Step 3: Connect the database
+
+**Where:** Vercel website, `lettr` project → **Settings** → **Environment Variables**.
+
+**Look first:** if `DATABASE_URL` and `DATABASE_URL_UNPOOLED` are listed, the database is already connected, so go to step 4.
+
+**If they aren't listed:**
+
+1. Open the **Storage** tab of the project and click **Create Database**.
+2. Choose **Neon**, the free plan and the region **US East (N. Virginia)**, then finish creating it.
+3. Connect it to this project with **Production** ticked.
+
+**What it does:** creates the free database and gives the project its connection details.
+
+**Check:** both variables now appear under **Settings → Environment Variables**.
+
+### Step 4: Add the secrets
+
+**Look first:** if `DEMO_MODE`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` and `CRON_SECRET` are already under **Settings → Environment Variables**, go to step 5. Check that `DEMO_MODE` is exactly `true`.
+
+**Where to run this:** the VS Code terminal.
+
+```powershell
+node scripts/vercel-env.mjs
+```
+
+**What it does:** prints four lines, three of them with newly generated secrets. It changes nothing and saves nothing.
+
+**Check:** you see four lines starting `DEMO_MODE=true`, `JWT_ACCESS_SECRET=`, `JWT_REFRESH_SECRET=` and `CRON_SECRET=`. If you get `Cannot find module`, the terminal is in the wrong folder or on the wrong branch. Run `git switch vercel-portfolio` in the LETTR folder and try again.
+
+**Then, on the Vercel website:**
+
+1. Select the four lines in the terminal and copy them. Keep them private: don't commit them or send them to anyone.
+2. Go to **Settings → Environment Variables** and click **Add**.
+3. Paste all four lines into the **Key** box. Vercel splits them into four entries.
+4. Select **Production** as the environment and click **Save**.
+
+**Check:** all four names are listed under Environment Variables.
+
+### Step 5: Build the current version
+
+**Where:** Vercel website, `lettr` project → **Deployments** → **Create Deployment**.
+
+**Do:** enter `vercel-portfolio` as the branch, then click **Create Deployment**.
+
+Don't use **Redeploy** on an existing row. That rebuilds the same old Phase 1 commit.
+
+**What it does:** builds the latest code on that branch, creates the database tables and loads the sample data.
+
+**Check:** a new row appears showing the branch `vercel-portfolio` and the label **Production**, and reaches **Ready** after a few minutes. If it says **Error**, click the row and read the build log. The first lines say exactly which setting is missing. Fix it, then repeat this step.
+
+### Step 6: Confirm the site is the current version
+
+Open your production address, which is shown on the project's main page. Press **Ctrl+F5** to skip the browser's copy of the old page, then check these:
+
+| Open | You should see |
+| --- | --- |
+| The home page | A dark bar across the top reading **Portfolio demo. Fictional homes and people. No real money moves.** The Phase 1 site doesn't have it |
+| `/demo` | **See a whole rental, from every side**, with three "Continue as…" cards |
+| `/api/health` | Text containing `"database":true,"store":true` |
+| `/demo`, then **Continue as tenant** | A dashboard for Tunde with rentals in progress |
+
+Finally, on the Vercel website, **Settings → Cron Jobs** should list `/api/demo/reset`.
+
+### Good to know
+
+- **Future updates:** anything pushed to `vercel-portfolio` now deploys to production automatically.
+- **Other branches:** pushes to `main` or `phase-2` create Preview deployments, which don't touch the live site. They may show as failed because the settings above apply to Production only. That's harmless.
+- **Your credit (optional):** add these under **Settings → Environment Variables**, then repeat step 5.
+
+| Variable | Shows on the tour page |
 | --- | --- |
 | `NEXT_PUBLIC_PORTFOLIO_AUTHOR` | "Built by" your name |
 | `NEXT_PUBLIC_PORTFOLIO_URL` | Makes your name a link |
 | `NEXT_PUBLIC_PORTFOLIO_REPO` | A "Read the source code" link. Only useful if the repository is public |
 
 Send clients to `/demo`, which has the one-click accounts and a suggested route.
-
-### Check that it worked
-
-- `/api/health` reports `"database":true,"store":true`.
-- `/demo` signs you in as each role with one click.
-- Under **Settings → Cron Jobs**, the `/api/demo/reset` job is listed. Clicking **Run** resets the data.
 
 ## Staying within the free plan
 
