@@ -8,7 +8,9 @@ export default defineConfig({
   testDir: "./e2e",
   timeout: 180_000,
   expect: { timeout: 15_000 },
+  // The tests share one database. Side by side, one can take a listing off the market while another views it.
   fullyParallel: false,
+  workers: 1,
   retries: 0,
   reporter: [["list"]],
   use: {

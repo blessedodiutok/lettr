@@ -14,7 +14,7 @@ const isProduction = target === "production";
 const noDatabase = !env.DATABASE_URL;
 
 /** Names only, never values: spots a database connected under a custom prefix. */
-const similarNames = Object.keys(env).filter((name) => /(DATABASE|POSTGRES).*URL/.test(name) && name !== "DATABASE_URL");
+const similarNames = Object.keys(env).filter((name) => /(DATABASE|POSTGRES).*URL/.test(name) && name !== "DATABASE_URL" && !name.startsWith("TEST_"));
 const databaseHelp = similarNames.length
   ? `Found ${similarNames.join(", ")}, so the database looks connected under a different name. Reconnect it with no Custom Prefix.`
   : `Under the project's Storage tab, connect the Neon database with ${target} ticked.`;
