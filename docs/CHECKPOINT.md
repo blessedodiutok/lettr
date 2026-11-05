@@ -89,6 +89,8 @@ Building the `vercel-portfolio` branch exposed three bugs that also exist at thi
 | The seed's delete order fails once a dispute exists | `pnpm db:seed` crashes on a database that has been used | `TRUNCATE` in `apps/api/src/demo/sampleData.ts` |
 | `pnpm db:seed` gives no warning that it deletes everything | Accounts you created yourself are lost | Warnings in the README |
 
+The CI workflow has also now run for the first time, on `vercel-portfolio`, where all three jobs pass. Getting there took two changes: pinning Ubuntu 24.04, because Playwright 1.60 does not support 26.04, and building the web app from the repository root in the end-to-end job. Building from inside `apps/web` failed in CI with a Turbopack error on the Google Fonts URL. The cause of that error was not established.
+
 ## Recommended next steps
 
 1. Review the running app. The README's "Getting started" section has the commands and seeded logins. Note that `pnpm db:seed` deletes everything in the database.
