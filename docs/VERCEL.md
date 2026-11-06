@@ -4,6 +4,28 @@ The `vercel-portfolio` branch runs Lettr as a public demo on Vercel's free Hobby
 
 To see where the main product stands, read [CHECKPOINT.md](CHECKPOINT.md). This demo is not the launch version.
 
+## Current deployment
+
+| | |
+| --- | --- |
+| Live at | <https://lettr-ashy.vercel.app> |
+| Vercel project | `hobbitses/lettr`: production branch `vercel-portfolio`, Root Directory `apps/web` |
+| Database | Neon `neon-crimson-castle` (free plan), connected for Production and Preview with no prefix |
+| First working build | 6 November 2026, commit `256f273` |
+
+A re-imported project starts with no variables and no database, and its builds stop at the settings check. To set it up again from the CLI, sign in with `vercel login`. Then run these in Git Bash, in the LETTR folder:
+
+```bash
+vercel link --yes --project lettr --scope hobbitses
+vercel integration resource connect neon-crimson-castle lettr -e production -e preview --yes --scope hobbitses
+printf true | vercel env add DEMO_MODE -e production,preview --no-sensitive --yes --scope hobbitses
+for name in JWT_ACCESS_SECRET JWT_REFRESH_SECRET CRON_SECRET; do
+  node -e "process.stdout.write(require('crypto').randomBytes(48).toString('hex'))" | vercel env add $name -e production,preview --sensitive --yes --scope hobbitses
+done
+```
+
+The secrets go straight from `node` to Vercel and are never printed. `vercel link` adds `.env*` to `.gitignore`, so remove that line afterwards, because it would also hide the `.env.example` files. The steps below do the same through the website.
+
 ## Deploy it
 
 These steps assume you've already imported the repository into Vercel. If you see the old Phase 1 design, this is the fix.

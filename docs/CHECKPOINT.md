@@ -91,6 +91,8 @@ Building the `vercel-portfolio` branch exposed three bugs that also exist at thi
 
 The CI workflow has also now run for the first time, on `vercel-portfolio`, where all three jobs pass. Getting there took two changes: pinning Ubuntu 24.04, because Playwright 1.60 does not support 26.04, and building the web app from the repository root in the end-to-end job. Building from inside `apps/web` failed in CI with a Turbopack error on the Google Fonts URL. The cause of that error was not established.
 
+The portfolio demo has been live since 6 November 2026 at <https://lettr-ashy.vercel.app>, built from `vercel-portfolio`. The earlier Vercel failures came from a project with no environment variables and no database. See [VERCEL.md](VERCEL.md#current-deployment).
+
 ## Recommended next steps
 
 1. Review the running app. The README's "Getting started" section has the commands and seeded logins. Note that `pnpm db:seed` deletes everything in the database.
